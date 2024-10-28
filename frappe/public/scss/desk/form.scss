@@ -254,12 +254,12 @@
 		.inline-graph-bar-inner {
 			display: block;
 			float: left;
-			background-color: var(--border-color);
+			background-color: #636a71;
 			height: 6px;
 			border-radius: 0px 3px 3px 0px;
 		}
 		.inline-graph-bar-inner.dark {
-			background-color: var(--primary-color);
+			background-color: #2490ef;
 		}
 	}
 	.inline-graph-half:first-child {

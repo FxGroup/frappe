@@ -369,7 +369,7 @@ def format_duration_fields(data: frappe._dict) -> None:
 				row[index] = format_duration(row[index])
 
 
-def build_xlsx_data(data, visible_idx, include_indentation, include_filters=False, ignore_visible_idx=False):
+def build_xlsx_data(data, visible_idx, include_indentation, include_filters=False, ignore_visible_idx=False, filter_export=None):
 	EXCEL_TYPES = (
 		str,
 		bool,
@@ -484,6 +484,11 @@ def add_total_row(result, columns, meta=None, is_tree=False, parent_field=None):
 			if i >= len(row):
 				continue
 			cell = row.get(fieldname) if isinstance(row, dict) else row[i]
+			if fieldtype is None:
+				if isinstance(cell, int):
+					fieldtype = "Int"
+				elif isinstance(cell, float):
+					fieldtype = "Float"
 			if fieldtype in ["Currency", "Int", "Float", "Percent", "Duration"] and flt(cell):
 				if not (is_tree and row.get(parent_field)):
 					total_row[i] = flt(total_row[i]) + flt(cell)
