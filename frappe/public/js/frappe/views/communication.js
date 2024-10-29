@@ -548,7 +548,10 @@ frappe.views.CommunicationComposer = class {
 				.add_options(print_formats)
 			
 			//Check if passed through else pick first
-			if (this.select_print_format) {
+			const default_format = "Sales Invoice Only";
+			if (print_formats.includes(default_format)) {
+				$(fields.select_print_format.input).val(default_format);
+			} else if (this.select_print_format) {
 				$(fields.select_print_format.input).val(this.select_print_format);
 			} else {
 				$(fields.select_print_format.input).val(print_formats[0]);
