@@ -496,7 +496,8 @@ def search(text, start=0, limit=20, doctype=""):
 
 		rank = (
 			Case()
-				.when(Instr(global_search.content, ": " + text + " |||") > 0, 2)  # Assign 2 points for an exact match
+				.when(Instr(global_search.content, ": " + text + " |||") > 0, 3)  # Assign 3 points for an exact match
+				.when(Instr(global_search.name, text) > 0, 2)  # Assign 2 points when the value is in the name of the document
 				.when(Instr(global_search.content, text) > 0, 1)  # Assign 1 point for partial match
 				.else_(0)  # Assign 0 points if no match
 		).as_("rank")
@@ -505,6 +506,7 @@ def search(text, start=0, limit=20, doctype=""):
 			frappe.qb.from_(global_search)
 			.select(global_search.doctype, global_search.name, global_search.content, rank)
 			.orderby("rank", order=frappe.qb.desc)
+			.orderby("name", order=frappe.qb.desc)
 			.limit(limit)
 		)
 
