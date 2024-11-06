@@ -112,9 +112,6 @@ frappe.ui.FieldGroup = class FieldGroup extends frappe.ui.form.Layout {
 				}
 			}
 
-			if (f.df.invalid) {
-				invalid.push(__(f.df.label));
-			}
 		}
 
 		if (errors.length && !ignore_errors) {
