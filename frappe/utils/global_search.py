@@ -476,7 +476,7 @@ def search(text, start=0, limit=20, doctype=""):
 		if cint(start) > 0:
 			query = query.offset(start)
 
-		result = query.run(as_dict=True, debug=1)
+		result = query.run(as_dict=True)
 
 		results.extend(result)
 
