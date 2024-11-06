@@ -169,6 +169,9 @@ frappe.ui.form.ControlData = class ControlData extends frappe.ui.form.ControlInp
 			}
 		};
 		this.$input.on("change", change_handler);
+		//Debug here to see how we can avoid turning this off for list view :)
+		//This gets bound on load of form
+		//TODO Look into this further
 		if (this.constructor.trigger_change_on_input_event && !this.in_grid()) {
 			// debounce to avoid repeated validations on value change
 			this.$input.on("input", frappe.utils.debounce(change_handler, 500));
