@@ -377,7 +377,8 @@ frappe.search.utils = {
 				var field_text = "";
 				for (var i = 0; i < parts.length; i++) {
 					var part = parts[i];
-					if (part.toLowerCase().indexOf(keywords) !== -1) {
+					// if (part.toLowerCase().indexOf(keywords) !== -1) {
+					if (true) {
 						// If the field contains the keyword
 						let colon_index, field_value;
 						if (part.indexOf(" &&& ") !== -1) {
@@ -403,12 +404,21 @@ frappe.search.utils = {
 							field_value = field_data;
 						}
 						var field_name = part.slice(0, colon_index);
-
+						
 						// Find remaining result_length and add field length to result_current_length
 						var remaining_length = result_max_length - result_current_length;
 						result_current_length += field_name.length + field_value.length + 2;
 						const search_result_name = me.fuzzy_search(keywords, field_name, true);
 						const search_result_value = me.fuzzy_search(keywords, field_value, true);
+						
+						if (!search_result_name.marked_string){
+							search_result_name.marked_string = search_result_name.item
+						}
+
+						if (!search_result_value.marked_string){
+							search_result_value.marked_string = search_result_value.item
+						}
+
 						if (result_current_length < result_max_length) {
 							// We have room, push the entire field
 							field_text =
