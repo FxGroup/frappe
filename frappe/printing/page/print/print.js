@@ -355,8 +355,6 @@ frappe.ui.form.PrintView = class {
 				limit: 0,
 			})
 			.then((letterheads) => {
-			.get_value("Letter Head", { disabled: 0, is_default: 1 }, "name")
-			.then(({ message }) => this.letterhead_selector.val(message.name));
 				letterheads.map((letterhead) => {
 					if (letterhead.is_default) default_letterhead = letterhead.name;
 					return letterhead_options.push(letterhead.name);
