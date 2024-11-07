@@ -555,17 +555,12 @@ $.extend(frappe.model, {
 		}
 		
 		$.each(to_update, (key, value) => {
-			if (doc && doc[key] !== value) {
+			if (doc && cur_frm.__changed_fields.key !== value) {
 				if (doc.__unedited && !(!doc[key] && !value)) {
 					// unset unedited flag for virgin rows
 					doc.__unedited = false;
 				}
-				if(!(key in cur_frm.__changed_fields)){
-					cur_frm.__changed_fields[key] = {"old_value":doc[key]}
-				}
-				if (value) {
-					cur_frm.__changed_fields[key]['new_value'] = value
-				}
+				cur_frm.__changed_fields[key] = doc[key]
 				doc[key] = value;
 				tasks.push(() => frappe.model.trigger(key, value, doc, skip_dirty_trigger));
 			} else {
