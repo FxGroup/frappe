@@ -96,6 +96,30 @@ frappe.views.CommunicationComposer = class {
 				fieldtype: "Link",
 				options: "Email Template",
 				fieldname: "email_template",
+				onchange: function () {
+					me.dialog.fields_dict.content.set_value("");
+					const email_template = me.dialog.fields_dict.email_template.get_value();
+					if (!email_template) return;
+		
+					function prepend_reply(reply) {
+						const content_field = me.dialog.fields_dict.content;
+						const subject_field = me.dialog.fields_dict.subject;
+		
+						content_field.set_value(`${reply.message}`);
+						subject_field.set_value(reply.subject);
+					}
+		
+					frappe.call({
+						method: "frappe.email.doctype.email_template.email_template.get_email_template",
+						args: {
+							template_name: email_template,
+							doc: me.doc,
+						},
+						callback(r) {
+							prepend_reply(r.message);
+						},
+					});
+				}
 			},
 			{
 				fieldtype: "HTML",
