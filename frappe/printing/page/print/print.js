@@ -737,7 +737,7 @@ frappe.ui.form.PrintView = class {
 		this.print_sel
 			.empty()
 			.add_options([
-				this.get_default_option_for_select(__("Select Print Format")),
+				// this.get_default_option_for_select(__("Select Print Format")),
 				...this.print_formats,
 			]);
 		return (
