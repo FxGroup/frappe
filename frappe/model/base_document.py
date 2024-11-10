@@ -315,12 +315,11 @@ class BaseDocument:
 				success = True
 
 		else:
-			from erpnext.stock.doctype.batch.batch import get_batches
+			from erpnext.stock.doctype.batch.batch import get_batches_by_oldest 
+
 			from dateutil.relativedelta import relativedelta
 			if not value.get('warehouse'):
 				value['warehouse'] = self.set_warehouse
-			batches = get_batches(value['item_code'], value["warehouse"], qty=1, throw=False, serial_no=None)
-			
 			posting_date = frappe.utils.today()
 			if self.get("posting_date"):
 				posting_date = self.get("posting_date")
@@ -328,6 +327,10 @@ class BaseDocument:
 				posting_date = datetime.datetime.strptime(posting_date, "%Y-%m-%d").date()
 			elif type(posting_date) is datetime.datetime:
 				posting_date = posting_date.date()
+
+			batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'])
+			batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
+
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
 			if specific_batch:
 				batches = [batch for batch in batches if batch['batch_id'] == specific_batch]
