@@ -328,7 +328,7 @@ class BaseDocument:
 			elif type(posting_date) is datetime.datetime:
 				posting_date = posting_date.date()
 
-			batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'])
+			batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date)
 			batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
 
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
