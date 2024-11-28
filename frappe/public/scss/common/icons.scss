@@ -8,13 +8,13 @@
 	background-repeat: no-repeat;
 	background-position: 50% 50%;
 	fill: var(--icon-fill);
-	stroke: var(--icon-stroke);
+	stroke: white;
 }
 
 .es-icon {
 	@extend .icon;
 	// reverse fill and stroke because of the way es icon is drawn
-	fill: var(--icon-stroke);
+	fill: white;
 	stroke: var(--icon-fill);
 }
 
