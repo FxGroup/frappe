@@ -184,7 +184,7 @@ class CommunicationEmailMixin:
 			)
 		return self._incoming_email_account
 
-	def mail_attachments(self, print_format=None, print_html=None, print_language=None):
+	def mail_attachments(self, print_format=None, print_html=None, print_language=None, additional_print_formats=None):
 		final_attachments = []
 
 		if print_format or print_html:
@@ -197,6 +197,16 @@ class CommunicationEmailMixin:
 				"lang": print_language or frappe.local.lang,
 			}
 			final_attachments.append(d)
+		if additional_print_formats:
+			for print_formats in additional_print_formats:
+				d = {
+					"print_format": print_formats["print_format"],
+					"print_format_attachment": 1,
+					"doctype": print_formats["doctype"],
+					"name": print_formats["name"],
+					"lang": print_language or frappe.local.lang,
+				}
+				final_attachments.append(d)
 
 		final_attachments.extend({"fid": a["name"]} for a in self.get_attachments() or [])
 		return final_attachments
@@ -254,6 +264,7 @@ class CommunicationEmailMixin:
 		self,
 		print_html=None,
 		print_format=None,
+		additional_print_formats=None,
 		send_me_a_copy=None,
 		print_letterhead=None,
 		is_inbound_mail_communcation=None,
@@ -275,7 +286,7 @@ class CommunicationEmailMixin:
 			return {}
 
 		final_attachments = self.mail_attachments(
-			print_format=print_format, print_html=print_html, print_language=print_language
+			print_format=print_format, print_html=print_html, print_language=print_language, additional_print_formats=additional_print_formats
 		)
 		incoming_email_account = self.get_incoming_email_account()
 		return {
@@ -304,6 +315,7 @@ class CommunicationEmailMixin:
 		self,
 		print_html=None,
 		print_format=None,
+		additional_print_formats=None,
 		send_me_a_copy=None,
 		print_letterhead=None,
 		is_inbound_mail_communcation=None,
@@ -313,6 +325,7 @@ class CommunicationEmailMixin:
 		if input_dict := self.sendmail_input_dict(
 			print_html=print_html,
 			print_format=print_format,
+			additional_print_formats=additional_print_formats,
 			send_me_a_copy=send_me_a_copy,
 			print_letterhead=print_letterhead,
 			is_inbound_mail_communcation=is_inbound_mail_communcation,

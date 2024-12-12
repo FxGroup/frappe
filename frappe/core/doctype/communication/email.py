@@ -39,6 +39,7 @@ def make(
 	send_email=False,
 	print_html=None,
 	print_format=None,
+	additional_print_formats=None,
 	attachments=None,
 	send_me_a_copy=False,
 	cc=None,
@@ -95,6 +96,7 @@ def make(
 		send_email=send_email,
 		print_html=print_html,
 		print_format=print_format,
+		additional_print_formats=additional_print_formats,
 		attachments=attachments,
 		send_me_a_copy=cint(send_me_a_copy),
 		cc=cc,
@@ -123,6 +125,7 @@ def _make(
 	send_email=False,
 	print_html=None,
 	print_format=None,
+	additional_print_formats=None,
 	attachments=None,
 	send_me_a_copy=False,
 	cc=None,
@@ -167,7 +170,9 @@ def _make(
 	)
 	comm.flags.skip_add_signature = not add_signature
 	comm.insert(ignore_permissions=True)
-
+	if additional_print_formats:
+		if isinstance(additional_print_formats, str):
+			additional_print_formats = json.loads(additional_print_formats)
 	# if not committed, delayed task doesn't find the communication
 	if attachments:
 		if isinstance(attachments, str):
@@ -186,6 +191,7 @@ def _make(
 		comm.send_email(
 			print_html=print_html,
 			print_format=print_format,
+			additional_print_formats=additional_print_formats,
 			send_me_a_copy=send_me_a_copy,
 			print_letterhead=print_letterhead,
 			print_language=print_language,
@@ -257,7 +263,6 @@ def add_attachments(name: str, attachments: Iterable[str | dict]) -> None:
 			}
 		else:
 			continue
-
 		file_args.update(
 			{
 				"attached_to_doctype": "Communication",
