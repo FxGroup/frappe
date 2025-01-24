@@ -1065,6 +1065,7 @@ def user_query(doctype, txt, searchfield, start, page_len, filters):
 		order_by="name asc",
 		or_filters=or_filters,
 		as_list=True,
+		ignore_permissions=True
 	)
 
 
