@@ -628,6 +628,16 @@ class FormTimeline extends BaseTimeline {
 			more_actions_wrapper.find(".dropdown-menu").append(delete_option);
 		}
 
+		const disabled_comment = $(`
+			<li>
+				<a class="dropdown-item">
+					${__("Disable Notify on Load")}
+				</a>
+			</li>
+		`).click(() => this.disable_comment(doc.name));
+
+		more_actions_wrapper.find(".dropdown-menu").append(disabled_comment);
+
 		let dismiss_button = $(`
 			<button class="btn btn-link action-btn">
 				${__("Dismiss")}
@@ -742,6 +752,21 @@ class FormTimeline extends BaseTimeline {
 		);
 		let element_id = $(ev.currentTarget).closest(".timeline-content").attr("id");
 		frappe.utils.copy_to_clipboard(`${doc_link}#${element_id}`);
+	}
+
+	disable_comment(comment_name) {
+		frappe.confirm(__("Disable Notify on Load?"), () => {
+			return frappe
+				.xcall("frappe.client.set_value", {
+					doctype: "Comment",
+					name: comment_name,
+					fieldname: "notify_on_load",
+					value: 0
+				})
+				.then(() => {
+					frappe.utils.play_sound("delete");
+				});
+		});
 	}
 }
 
