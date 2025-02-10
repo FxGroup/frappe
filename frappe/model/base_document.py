@@ -344,6 +344,11 @@ class BaseDocument:
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
 			if specific_batch:
 				batches = [batch for batch in batches if batch['batch_id'] == specific_batch]
+			for item in self.get(key):
+				if item.get("batch_no") and item.get("item_code") == value['item_code']:
+					for batch in batches:
+						if batch["batch_id"] == item.get("batch_no"):
+							batch["qty"] -= item.get("qty")
 
 			expiry_date = int(frappe.get_value("Item", value['item_code'], "shortdated_timeframe_in_months"))
 			expiry_cutoff = posting_date + relativedelta(months=expiry_date)
