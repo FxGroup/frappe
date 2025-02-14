@@ -41,7 +41,7 @@ def search_link(
 	txt: str,
 	query: str | None = None,
 	filters: str | dict | list | None = None,
-	page_length: int = 10,
+	page_length: int = 20,
 	searchfield: str | None = None,
 	reference_doctype: str | None = None,
 	ignore_user_permissions: bool = False,
