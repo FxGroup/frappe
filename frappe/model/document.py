@@ -171,7 +171,7 @@ class Document(BaseDocument):
 			if not d:
 				if not frappe.conf.production_site:
 					import traceback
-					logger = frappe.logger("Not found", allow_site=True, file_count=3, max_size = 10000000)
+					logger = frappe.logger("Not found", allow_site=True, file_count=1, max_size = 5000000)
 					message = ""
 					stack_trace = traceback.extract_stack()
 					for frame in stack_trace[:-1]:  # Exclude the current frame
