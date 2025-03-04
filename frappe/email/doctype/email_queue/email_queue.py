@@ -161,6 +161,14 @@ class EmailQueue(Document):
 			ctx.fetch_smtp_server()
 			message = None
 			for recipient in self.recipients:
+
+				if not frappe.conf.production_site:
+					if "fxmed" in recipient.recipient or "rnlabs" in recipient.recipient:
+						pass
+					else:
+						recipient.status = "Sent"
+						continue
+
 				if recipient.is_mail_sent():
 					continue
 

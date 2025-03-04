@@ -169,6 +169,17 @@ class Document(BaseDocument):
 			)
 
 			if not d:
+				if not frappe.conf.production_site:
+					import traceback
+					logger = frappe.logger("Not found", allow_site=True, file_count=1, max_size = 5000000)
+					message = ""
+					stack_trace = traceback.extract_stack()
+					for frame in stack_trace[:-1]:  # Exclude the current frame
+						filename, line_number, func_name, text = frame
+						message += f"File: {filename}, Line: {line_number}, Function: {func_name}\n"
+						if text:
+							message += text + "\n"
+					logger.debug(message)
 				frappe.throw(
 					_("{0} {1} not found").format(_(self.doctype), self.name), frappe.DoesNotExistError
 				)
