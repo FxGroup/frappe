@@ -176,7 +176,13 @@ class ScheduledJobType(Document):
 		frappe.db.commit()
 
 	def get_queue_name(self):
-		return "long" if ("Long" in self.frequency) else "default"
+		if "Long" in self.frequency:
+			return "long"
+		elif "Cron" in self.frequency:
+			return "cron"
+		else:
+			return "default"
+
 
 	def on_trash(self):
 		frappe.db.delete("Scheduled Job Log", {"scheduled_job_type": self.name})
