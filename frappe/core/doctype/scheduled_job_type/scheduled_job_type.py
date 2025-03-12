@@ -69,9 +69,6 @@ class ScheduledJobType(Document):
 
 	def enqueue(self, force=False) -> bool:
 		# enqueue event if last execution is done
-		frappe.logger("scheduler").error(
-			"Enqueue called with self attributes: " + str(self.__dict__)
-		)
 		if self.is_event_due() or force:
 			if not self.is_job_in_queue():
 				enqueue(
