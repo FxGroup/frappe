@@ -71,11 +71,15 @@ class ScheduledJobType(Document):
 		# enqueue event if last execution is done
 		if self.is_event_due() or force:
 			if not self.is_job_in_queue():
+				timeout = None
+				if "cron" in self.frequency:
+					timeout = 2000
 				enqueue(
 					"frappe.core.doctype.scheduled_job_type.scheduled_job_type.run_scheduled_job",
 					queue=self.get_queue_name(),
 					job_type=self.method,
 					job_id=self.rq_job_id,
+					timeout=timeout
 				)
 				return True
 			else:
@@ -175,8 +179,6 @@ class ScheduledJobType(Document):
 	def get_queue_name(self):
 		if "Long" in self.frequency:
 			return "long"
-		elif "Cron" in self.frequency:
-			return "cron"
 		else:
 			return "default"
 
