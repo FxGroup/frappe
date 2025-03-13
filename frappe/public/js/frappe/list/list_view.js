@@ -300,8 +300,14 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 	make_new_doc() {
 		const doctype = this.doctype;
 		const options = {};
+		const allowed_filter_types = [
+			"=",
+			"descendants of (inclusive)",
+			"descendants of",
+			"ancestors of",
+		];
 		this.filter_area.get().forEach((f) => {
-			if (f[2] === "=" && frappe.model.is_non_std_field(f[1])) {
+			if (allowed_filter_types.includes(f[2]) && frappe.model.is_non_std_field(f[1])) {
 				options[f[1]] = f[3];
 			}
 		});
@@ -2109,9 +2115,13 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 	parse_filters_from_route_options() {
 		const filters = [];
 
-		for (let field in frappe.route_options) {
+		let params = new URLSearchParams(window.location.search);
+		if (!params.toString() && frappe.route_options) {
+			params = new Map(Object.entries(frappe.route_options));
+		}
+
+		params.forEach((value, field) => {
 			let doctype = null;
-			let value = frappe.route_options[field];
 
 			let value_array;
 			if ($.isArray(value) && value[0].startsWith("[") && value[0].endsWith("]")) {
@@ -2153,7 +2163,7 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 					filters.push([doctype, field, "=", value]);
 				}
 			}
-		}
+		});
 
 		return filters;
 	}
