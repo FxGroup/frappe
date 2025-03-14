@@ -75,6 +75,7 @@ class ScheduledJobType(Document):
 					"frappe.core.doctype.scheduled_job_type.scheduled_job_type.run_scheduled_job",
 					queue=self.get_queue_name(),
 					job_type=self.method,
+					timeout=2000,
 					job_id=self.rq_job_id
 				)
 				return True
