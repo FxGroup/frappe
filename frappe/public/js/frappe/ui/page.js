@@ -203,11 +203,6 @@ frappe.ui.Page = class Page {
 					this.setup_overlay_sidebar();
 				} else {
 					sidebar_wrapper.toggle();
-					if (sidebar_wrapper.css('display') == "none"){
-						main_section_wrapper.addClass('col-md-12').removeClass('col-md-10')
-					} else {
-						main_section_wrapper.addClass('col-md-10').removeClass('col-md-12')
-					}
 				}
 				$(document.body).trigger("toggleSidebar");
 				this.update_sidebar_icon();
