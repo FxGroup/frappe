@@ -134,10 +134,10 @@ frappe.views.Calendar = class Calendar {
 	get_default_options() {
 		return new Promise((resolve) => {
 			let defaultView = localStorage.getItem("cal_defaultView");
-			let weekends = localStorage.getItem("cal_weekends");
+			//let weekends = localStorage.getItem("cal_weekends");
 			let defaults = {
 				defaultView: defaultView ? defaultView : "month",
-				weekends: weekends ? weekends : true,
+				weekends: false,
 			};
 			resolve(defaults);
 		}).then((defaults) => {
