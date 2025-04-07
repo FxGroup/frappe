@@ -1344,3 +1344,17 @@ def impersonate(user: str, reason: str):
 	notification.set("type", "Alert")
 	notification.insert(ignore_permissions=True)
 	frappe.local.login_manager.impersonate(user)
+
+
+@frappe.whitelist(methods=["POST"])
+def stop_impersonate(user: str, password: str, permission: bool = None):
+    if not permission:
+        frappe.only_for("Administrator")
+    
+    # Verify the user's password
+    if not frappe.auth.LoginManager().check_password(user, password):
+        frappe.throw("Invalid password. Please provide the correct password for the user.")
+    
+    frappe.local.login_manager.login_as(user)
+    frappe.session.data["impersonated_by"] = None
+    frappe.session.user = user

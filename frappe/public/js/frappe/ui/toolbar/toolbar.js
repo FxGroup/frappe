@@ -48,6 +48,45 @@ frappe.ui.toolbar.Toolbar = class {
 		$('.navbar-toggle-ugly-mode').click(() => {
 			frappe.ui.toolbar.toggle_ugly_mode();
 		});
+		$('#stop-impersonate').click(() => {
+			if (frappe.boot.user.impersonated_by) {
+				const $impersonationElements = $('.indicator-pill').filter(function() {
+					return $(this).attr('id') === 'stop-impersonate' || 
+						   $(this).text().includes('Impersonating');
+				});
+				$impersonationElements.remove();
+	
+				frappe.prompt([
+					{
+						fieldname: "password",
+						fieldtype: "Password",
+						label: "Enter Your Password",
+						reqd: 1
+					}
+				], (values) => {
+					frappe.xcall('frappe.core.doctype.user.user.stop_impersonate', {
+						user: frappe.boot.user.impersonated_by,
+						password: values.password,
+						permission: 1
+					})
+					.then(() => {
+						window.location.reload();
+					})
+					.catch((error) => {
+						frappe.msgprint({
+							title: __('Error'),
+							indicator: 'red',
+							message: __('Failed to revert to original user: ') + error.message
+						});
+					});
+				}, "Password Required", "Submit");
+			} else {
+				frappe.msgprint({
+					title: __('Warning'),
+					message: __('Not currently impersonating any user')
+				});
+			}
+		});
 	}
 
 	setup_announcement_widget() {
