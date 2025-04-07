@@ -50,12 +50,6 @@ frappe.ui.toolbar.Toolbar = class {
 		});
 		$('#stop-impersonate').click(() => {
 			if (frappe.boot.user.impersonated_by) {
-				const $impersonationElements = $('.indicator-pill').filter(function() {
-					return $(this).attr('id') === 'stop-impersonate' || 
-						   $(this).text().includes('Impersonating');
-				});
-				$impersonationElements.remove();
-	
 				frappe.prompt([
 					{
 						fieldname: "password",
@@ -70,6 +64,11 @@ frappe.ui.toolbar.Toolbar = class {
 						permission: 1
 					})
 					.then(() => {
+						const $impersonationElements = $('.indicator-pill').filter(function() {
+							return $(this).attr('id') === 'stop-impersonate' || 
+								   $(this).text().includes('Impersonating');
+						});
+						$impersonationElements.remove();
 						window.location.reload();
 					})
 					.catch((error) => {
