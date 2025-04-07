@@ -20,6 +20,12 @@
 						<span class="indicator-pill red no-indicator-dot" title="{%= __("You are impersonating as another user.") %}">
 							{%= __("Impersonating {0}", [frappe.boot.user.name]) %}
 						</span>
+						<button class="btn indicator-pill blue no-indicator-dot" 
+								id="stop-impersonate"
+								style="margin-left: 5px;"
+								title="{%= __("Stop impersonating and return to {0}", [frappe.boot.user.impersonated_by]) %}">
+							{%= __("Revert to {0}", [frappe.boot.user.impersonated_by]) %}
+						</button>
 					{% } %}
 					<div class="input-group search-bar text-muted hidden">
 						<input
