@@ -373,27 +373,31 @@ frappe.ui.form.on("User", {
 				// 	});
 				// 	return;
 				// }
-				frappe.prompt(
-					[
-						{
-							fieldname: "reason",
-							fieldtype: "Small Text",
-							label: "Reason for impersonating",
-							description: __("Note: This will be shared with user."),
-							reqd: 1,
-						},
-					],
-					(values) => {
-						frappe
-							.xcall("frappe.core.doctype.user.user.impersonate", {
-								user: frm.doc.name,
-								reason: values.reason,
-							})
-							.then(() => window.location.reload());
-					},
-					__("Impersonate as {0}", [frm.doc.name]),
-					__("Confirm")
-				);
+				// frappe.prompt(
+				// 	[
+				// 		{
+				// 			fieldname: "reason",
+				// 			fieldtype: "Small Text",
+				// 			label: "Reason for impersonating",
+				// 			description: __("Note: This will be shared with user."),
+				// 			reqd: 1,
+				// 		},
+				// 	],
+				// 	(values) => {
+				// 		frappe
+				// 			.xcall("frappe.core.doctype.user.user.impersonate", {
+				// 				user: frm.doc.name,
+				// 				reason: values.reason,
+				// 			})
+				// 			.then(() => window.location.reload());
+				// 	},
+				// 	__("Impersonate as {0}", [frm.doc.name]),
+				// 	__("Confirm")
+				// );
+				frappe.xcall("frappe.core.doctype.user.user.impersonate", {
+					user: frm.doc.name,
+				})
+				.then(() => window.location.reload());
 			});
 		}
 	},
