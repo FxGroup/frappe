@@ -365,3 +365,43 @@ frappe.ui.toolbar.setup_session_defaults = function () {
 		},
 	});
 };
+
+
+frappe.ui.toolbar.setup_impersonation = function () {
+    frappe.prompt(
+        [
+            {
+                fieldname: "user",
+                fieldtype: "Link",
+                options: "User",
+                label: "Select User to Impersonate",
+                reqd: 1,
+                get_query: () => {
+                    return {
+                        filters: {
+                            enabled: 1,
+							name: ["!=", frappe.session.user]
+                        },
+                    };
+                },
+            },
+        ],
+        (values) => {
+            frappe.xcall("frappe.core.doctype.user.user.impersonate", {
+                user: values.user,
+            })
+                .then(() => {
+                    window.location.reload();
+                })
+                .catch((error) => {
+                    frappe.msgprint({
+                        title: __("Error"),
+                        indicator: "red",
+                        message: __("Failed to impersonate user: ") + error.message,
+                    });
+                });
+        },
+        __("Impersonate User"),
+        __("Impersonate")
+    );
+};
