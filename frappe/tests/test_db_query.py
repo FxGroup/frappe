@@ -1190,6 +1190,19 @@ class TestDBQuery(FrappeTestCase):
 		self.assertEqual(count[0], frappe.db.count("Language"))
 		self.assertEqual(count[1], frappe.db.count("Language"))
 
+	def test_ifnull_none(self):
+		query = frappe.get_all("DocField", {"fieldname": None}, run=0)
+		self.assertIn("''", query)
+		self.assertNotIn("\\'", query)
+		self.assertNotIn("ifnull", query)
+
+	def test_ifnull_fallback_types(self):
+		query = frappe.get_all("DocField", {"fieldname": ("!=", None)}, run=0)
+		# Fallbacks should always be of correct type
+		self.assertIn("''", query)
+		self.assertNotIn("0", query)
+		self.assertNotIn("ifnull", query)
+
 
 class TestReportView(FrappeTestCase):
 	@run_only_if(db_type_is.MARIADB)  # TODO: postgres name casting is messed up
@@ -1477,294 +1490,19 @@ class TestReportView(FrappeTestCase):
 			response = execute_cmd("frappe.desk.reportview.get")
 			self.assertListEqual(response["keys"], ["published", "title", "test_field"])
 
-	def test_virtual_doctype(self):
-		"""Test that virtual doctypes can be queried using get_all"""
+	def test_db_filter_not_set(self):
+		"""
+		Test if the 'not set' filter always translates correctly with/without qb under the hood.
+		"""
+		frappe.get_doc({"doctype": "ToDo", "description": "filter test"}).insert()
+		frappe.get_doc({"doctype": "ToDo", "description": "filter test", "reference_name": ""}).insert()
 
-		virtual_doctype = new_doctype("Virtual DocType")
-		virtual_doctype.is_virtual = 1
-		virtual_doctype.insert(ignore_if_duplicate=True)
-
-		class VirtualDocType:
-			@staticmethod
-			def get_list(args):
-				...
-
-		with patch("frappe.controllers", new={frappe.local.site: {"Virtual DocType": VirtualDocType}}):
-			VirtualDocType.get_list = MagicMock()
-
-			frappe.get_all("Virtual DocType", filters={"name": "test"}, fields=["name"], limit=1)
-
-			call_args = VirtualDocType.get_list.call_args[0][0]
-			VirtualDocType.get_list.assert_called_once()
-			self.assertIsInstance(call_args, dict)
-			self.assertEqual(call_args["doctype"], "Virtual DocType")
-			self.assertEqual(call_args["filters"], [["Virtual DocType", "name", "=", "test"]])
-			self.assertEqual(call_args["fields"], ["name"])
-			self.assertEqual(call_args["limit_page_length"], 1)
-			self.assertEqual(call_args["limit_start"], 0)
-			self.assertEqual(call_args["order_by"], DefaultOrderBy)
-
-	def test_coalesce_with_in_ops(self):
-		self.assertNotIn("ifnull", frappe.get_all("User", {"first_name": ("in", ["a", "b"])}, run=0))
-		self.assertIn("ifnull", frappe.get_all("User", {"first_name": ("in", ["a", None])}, run=0))
-		self.assertIn("ifnull", frappe.get_all("User", {"first_name": ("in", ["a", ""])}, run=0))
-		self.assertIn("ifnull", frappe.get_all("User", {"first_name": ("in", [])}, run=0))
-		self.assertIn("ifnull", frappe.get_all("User", {"first_name": ("not in", ["a"])}, run=0))
-		self.assertIn("ifnull", frappe.get_all("User", {"first_name": ("not in", [])}, run=0))
-		self.assertIn("ifnull", frappe.get_all("User", {"first_name": ("not in", [""])}, run=0))
-
-		# primary key is never nullable
-		self.assertNotIn("ifnull", frappe.get_all("User", {"name": ("in", ["a", None])}, run=0))
-		self.assertNotIn("ifnull", frappe.get_all("User", {"name": ("in", ["a", ""])}, run=0))
-		self.assertNotIn("ifnull", frappe.get_all("User", {"name": ("in", (""))}, run=0))
-		self.assertNotIn("ifnull", frappe.get_all("User", {"name": ("in", ())}, run=0))
-
-	def test_coalesce_with_datetime_ops(self):
-		self.assertNotIn("ifnull", frappe.get_all("User", {"last_active": (">", "2022-01-01")}, run=0))
-		self.assertNotIn("ifnull", frappe.get_all("User", {"creation": ("<", "2022-01-01")}, run=0))
-		self.assertNotIn(
-			"ifnull",
-			frappe.get_all("User", {"last_active": ("between", ("2022-01-01", "2023-01-01"))}, run=0),
+		# `get_all` does not use QueryBuilder while `count` does. Both should return the same result.
+		# `not set` must consider empty strings and NULL values both.
+		self.assertEqual(
+			len(frappe.get_all("ToDo", filters={"reference_name": ["is", "not set"]})),
+			frappe.db.count("ToDo", {"reference_name": ["is", "not set"]}),
 		)
-		self.assertIn("ifnull", frappe.get_all("User", {"last_active": ("<", "2022-01-01")}, run=0))
-
-	def test_ambiguous_linked_tables(self):
-		from frappe.desk.reportview import get
-
-		if not frappe.db.exists("DocType", "Related Todos"):
-			frappe.get_doc(
-				{
-					"doctype": "DocType",
-					"custom": 1,
-					"module": "Custom",
-					"name": "Related Todos",
-					"naming_rule": "Random",
-					"autoname": "hash",
-					"fields": [
-						{
-							"label": "Todo One",
-							"fieldname": "todo_one",
-							"fieldtype": "Link",
-							"options": "ToDo",
-							"reqd": 1,
-						},
-						{
-							"label": "Todo Two",
-							"fieldname": "todo_two",
-							"fieldtype": "Link",
-							"options": "ToDo",
-							"reqd": 1,
-						},
-					],
-				}
-			).insert()
-		else:
-			frappe.db.delete("Related Todos")
-
-		todo_one = frappe.get_doc(
-			{
-				"doctype": "ToDo",
-				"description": "Todo One",
-			}
-		).insert()
-
-		todo_two = frappe.get_doc(
-			{
-				"doctype": "ToDo",
-				"description": "Todo Two",
-			}
-		).insert()
-
-		frappe.get_doc(
-			{
-				"doctype": "Related Todos",
-				"todo_one": todo_one.name,
-				"todo_two": todo_two.name,
-			}
-		).insert()
-
-		frappe.form_dict.doctype = "Related Todos"
-		frappe.form_dict.fields = [
-			"`tabRelated Todos`.`name`",
-			"`tabRelated Todos`.`todo_one`",
-			"`tabRelated Todos`.`todo_two`",
-			# because ToDo.show_title_as_field_link = 1
-			"todo_one.description as todo_one_description",
-			"todo_two.description as todo_two_description",
-		]
-
-		# Shouldn't raise pymysql.err.OperationalError: (1066, "Not unique table/alias: 'tabToDo'")
-		data = get()
-		self.assertEqual(len(data["values"]), 1)
-
-
-class TestReportView(FrappeTestCase):
-	def setUp(self) -> None:
-		frappe.set_user("Administrator")
-		return super().setUp()
-
-	@run_only_if(db_type_is.MARIADB)  # TODO: postgres name casting is messed up
-	def test_get_count(self):
-		frappe.local.request = frappe._dict()
-		frappe.local.request.method = "GET"
-
-		# test with data check field
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "DocType",
-				"filters": [["DocType", "show_title_field_in_link", "=", 1]],
-				"fields": [],
-				"distinct": "false",
-			}
-		)
-		count = execute_cmd("frappe.desk.reportview.get_count")
-		frappe.local.form_dict = frappe._dict(
-			{"doctype": "DocType", "filters": {"show_title_field_in_link": 1}, "distinct": "true"}
-		)
-		dict_filter_response = execute_cmd("frappe.desk.reportview.get_count")
-		self.assertIsInstance(count, int)
-		self.assertEqual(count, dict_filter_response)
-
-		# test with child table filter
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "DocType",
-				"filters": [["DocField", "fieldtype", "=", "Data"]],
-				"fields": [],
-				"distinct": "true",
-			}
-		)
-		child_filter_response = execute_cmd("frappe.desk.reportview.get_count")
-		current_value = frappe.db.sql(
-			# the below query is equivalent to the one in reportview.get_count
-			"select distinct count(distinct `tabDocType`.name) as total_count"
-			" from `tabDocType` left join `tabDocField`"
-			" on (`tabDocField`.parenttype = 'DocType' and `tabDocField`.parent = `tabDocType`.name)"
-			" where `tabDocField`.`fieldtype` = 'Data'"
-		)[0][0]
-		self.assertEqual(child_filter_response, current_value)
-
-		# test with limit
-		limit = 2
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "DocType",
-				"filters": [["DocType", "is_virtual", "=", 1]],
-				"fields": [],
-				"distinct": "false",
-				"limit": limit,
-			}
-		)
-		count = execute_cmd("frappe.desk.reportview.get_count")
-		self.assertIsInstance(count, int)
-		self.assertLessEqual(count, limit)
-
-		# test with distinct
-		limit = 2
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "DocType",
-				"fields": [],
-				"distinct": "true",
-				"limit": limit,
-			}
-		)
-		count = execute_cmd("frappe.desk.reportview.get_count")
-		self.assertIsInstance(count, int)
-		self.assertLessEqual(count, limit)
-
-		# doctype with space in name
-		limit = 2
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "Role Profile",
-				"fields": [],
-				"distinct": "true",
-				"limit": limit,
-			}
-		)
-		count = execute_cmd("frappe.desk.reportview.get_count")
-		self.assertIsInstance(count, int)
-		self.assertLessEqual(count, limit)
-
-	def test_reportview_get(self):
-		user = frappe.get_doc("User", "test@example.com")
-		add_child_table_to_blog_post()
-
-		user_roles = frappe.get_roles()
-		user.remove_roles(*user_roles)
-		user.add_roles("Blogger")
-
-		make_property_setter("Blog Post", "published", "permlevel", 1, "Int")
-		reset("Blog Post")
-		add("Blog Post", "Website Manager", 1)
-		update("Blog Post", "Website Manager", 1, "write", 1)
-
-		frappe.set_user(user.name)
-
-		frappe.local.request = frappe._dict()
-		frappe.local.request.method = "POST"
-
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "Blog Post",
-				"fields": ["published", "title", "`tabTest Child`.`test_field`"],
-			}
-		)
-
-		# even if * is passed, fields which are not accessible should be filtered out
-		response = execute_cmd("frappe.desk.reportview.get")
-		self.assertListEqual(response["keys"], ["title"])
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "Blog Post",
-				"fields": ["*"],
-			}
-		)
-
-		response = execute_cmd("frappe.desk.reportview.get")
-		self.assertNotIn("published", response["keys"])
-
-		frappe.set_user("Administrator")
-		user.add_roles("Website Manager")
-
-		# Admin should be able to see access all fields
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "Blog Post",
-				"fields": ["published", "title", "`tabTest Child`.`test_field`"],
-			}
-		)
-
-		response = execute_cmd("frappe.desk.reportview.get")
-		self.assertListEqual(response["keys"], ["published", "title", "test_field"])
-
-		# reset user roles
-		user.remove_roles("Blogger", "Website Manager")
-		user.add_roles(*user_roles)
-
-	def test_reportview_get_aggregation(self):
-		# test aggregation based on child table field
-		frappe.local.request = frappe._dict(method="GET")
-		frappe.local.form_dict = frappe._dict(
-			{
-				"doctype": "DocType",
-				"fields": """["`tabDocField`.`label` as field_label","`tabDocField`.`name` as field_name"]""",
-				"filters": "[]",
-				"order_by": "_aggregate_column desc",
-				"start": 0,
-				"page_length": 20,
-				"view": "Report",
-				"with_comment_count": 0,
-				"group_by": "field_label, field_name",
-				"aggregate_on_field": "columns",
-				"aggregate_on_doctype": "DocField",
-				"aggregate_function": "sum",
-			}
-		)
-
-		response = execute_cmd("frappe.desk.reportview.get")
-		self.assertListEqual(response["keys"], ["field_label", "field_name", "_aggregate_column"])
 
 
 def add_child_table_to_blog_post():
