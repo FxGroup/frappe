@@ -1319,7 +1319,7 @@ def get_enabled_users():
 
 
 @frappe.whitelist(methods=["POST"])
-def impersonate(user: str, reason: str):
+def impersonate(user: str, reason: str = None):
 	# Note: For now we only allow admins, we MIGHT allow system manager in future.
 	# All the impersonation code doesn't assume anything about user.
 	frappe.only_for("Administrator")
@@ -1335,12 +1335,26 @@ def impersonate(user: str, reason: str):
 		}
 	).insert(ignore_permissions=True, ignore_links=True)
 
-	notification = frappe.new_doc(
-		"Notification Log",
-		for_user=user,
-		from_user=frappe.session.user,
-		subject=_("{0} just impersonated as you. They gave this reason: {1}").format(impersonator, reason),
-	)
-	notification.set("type", "Alert")
-	notification.insert(ignore_permissions=True)
+	# notification = frappe.new_doc(
+	# 	"Notification Log",
+	# 	for_user=user,
+	# 	from_user=frappe.session.user,
+	# 	subject=_("{0} just impersonated as you. They gave this reason: {1}").format(impersonator, reason),
+	# )
+	# notification.set("type", "Alert")
+	# notification.insert(ignore_permissions=True)
 	frappe.local.login_manager.impersonate(user)
+
+
+@frappe.whitelist(methods=["POST"])
+def stop_impersonate(user: str, password: str, permission: bool = None):
+    if not permission:
+        frappe.only_for("Administrator")
+    
+    # Verify the user's password
+    if not frappe.auth.LoginManager().check_password(user, password):
+        frappe.throw("Invalid password. Please provide the correct password for the user.")
+    
+    frappe.local.login_manager.login_as(user)
+    frappe.session.data["impersonated_by"] = None
+    frappe.session.user = user

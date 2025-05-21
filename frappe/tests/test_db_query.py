@@ -1297,93 +1297,93 @@ class TestReportView(FrappeTestCase):
 		user = frappe.get_doc("User", "test@example.com")
 		add_child_table_to_blog_post()
 
-			data = frappe.get_list(
-				"Blog Post", filters={"published": 1}, fields=["name", "`published`"], limit=1
-			)
-			self.assertFalse("published" in data[0])
-			self.assertTrue("name" in data[0])
-			self.assertEqual(len(data[0]), 1)
+		data = frappe.get_list(
+			"Blog Post", filters={"published": 1}, fields=["name", "`published`"], limit=1
+		)
+		self.assertFalse("published" in data[0])
+		self.assertTrue("name" in data[0])
+		self.assertEqual(len(data[0]), 1)
 
-			data = frappe.get_list(
-				"Blog Post", filters={"published": 1}, fields=["name", "`tabBlog Post`.`published`"], limit=1
-			)
-			self.assertFalse("published" in data[0])
-			self.assertTrue("name" in data[0])
-			self.assertEqual(len(data[0]), 1)
+		data = frappe.get_list(
+			"Blog Post", filters={"published": 1}, fields=["name", "`tabBlog Post`.`published`"], limit=1
+		)
+		self.assertFalse("published" in data[0])
+		self.assertTrue("name" in data[0])
+		self.assertEqual(len(data[0]), 1)
 
-			data = frappe.get_list(
-				"Blog Post",
-				filters={"published": 1},
-				fields=["name", "`tabTest Child`.`test_field`"],
-				limit=1,
-			)
-			self.assertFalse("test_field" in data[0])
-			self.assertTrue("name" in data[0])
-			self.assertEqual(len(data[0]), 1)
+		data = frappe.get_list(
+			"Blog Post",
+			filters={"published": 1},
+			fields=["name", "`tabTest Child`.`test_field`"],
+			limit=1,
+		)
+		self.assertFalse("test_field" in data[0])
+		self.assertTrue("name" in data[0])
+		self.assertEqual(len(data[0]), 1)
 
-			data = frappe.get_list(
-				"Blog Post", filters={"published": 1}, fields=["name", "MAX(`published`)"], limit=1
-			)
-			self.assertTrue("name" in data[0])
-			self.assertEqual(len(data[0]), 1)
+		data = frappe.get_list(
+			"Blog Post", filters={"published": 1}, fields=["name", "MAX(`published`)"], limit=1
+		)
+		self.assertTrue("name" in data[0])
+		self.assertEqual(len(data[0]), 1)
 
-			data = frappe.get_list(
-				"Blog Post", filters={"published": 1}, fields=["name", "LAST(published)"], limit=1
-			)
-			self.assertTrue("name" in data[0])
-			self.assertEqual(len(data[0]), 1)
+		data = frappe.get_list(
+			"Blog Post", filters={"published": 1}, fields=["name", "LAST(published)"], limit=1
+		)
+		self.assertTrue("name" in data[0])
+		self.assertEqual(len(data[0]), 1)
 
-			data = frappe.get_list(
-				"Blog Post",
-				filters={"published": 1},
-				fields=["name", "MAX(`modified`)"],
-				limit=1,
-				order_by=None,
-				group_by="name",
-			)
-			self.assertEqual(len(data[0]), 2)
+		data = frappe.get_list(
+			"Blog Post",
+			filters={"published": 1},
+			fields=["name", "MAX(`modified`)"],
+			limit=1,
+			order_by=None,
+			group_by="name",
+		)
+		self.assertEqual(len(data[0]), 2)
 
-			data = frappe.get_list(
-				"Blog Post", filters={"published": 1}, fields=["name", "now() abhi"], limit=1
-			)
-			self.assertIsInstance(data[0]["abhi"], datetime.datetime)
-			self.assertEqual(len(data[0]), 2)
+		data = frappe.get_list(
+			"Blog Post", filters={"published": 1}, fields=["name", "now() abhi"], limit=1
+		)
+		self.assertIsInstance(data[0]["abhi"], datetime.datetime)
+		self.assertEqual(len(data[0]), 2)
 
-			data = frappe.get_list("Blog Post", filters={"published": 1}, fields=["name", "'LABEL'"], limit=1)
-			self.assertTrue("name" in data[0])
-			self.assertTrue("LABEL" in data[0].values())
-			self.assertEqual(len(data[0]), 2)
+		data = frappe.get_list("Blog Post", filters={"published": 1}, fields=["name", "'LABEL'"], limit=1)
+		self.assertTrue("name" in data[0])
+		self.assertTrue("LABEL" in data[0].values())
+		self.assertEqual(len(data[0]), 2)
 
-			data = frappe.get_list(
-				"Blog Post",
-				filters={"published": 1},
-				fields=["name", "COUNT(*) as count"],
-				limit=1,
-				order_by=None,
-				group_by="name",
-			)
-			self.assertTrue("count" in data[0])
-			self.assertEqual(len(data[0]), 2)
+		data = frappe.get_list(
+			"Blog Post",
+			filters={"published": 1},
+			fields=["name", "COUNT(*) as count"],
+			limit=1,
+			order_by=None,
+			group_by="name",
+		)
+		self.assertTrue("count" in data[0])
+		self.assertEqual(len(data[0]), 2)
 
-			data = frappe.get_list(
-				"Blog Post",
-				filters={"published": 1},
-				fields=["name", "COUNT(*) count"],
-				limit=1,
-				order_by=None,
-				group_by="name",
-			)
-			self.assertTrue("count" in data[0])
-			self.assertEqual(len(data[0]), 2)
+		data = frappe.get_list(
+			"Blog Post",
+			filters={"published": 1},
+			fields=["name", "COUNT(*) count"],
+			limit=1,
+			order_by=None,
+			group_by="name",
+		)
+		self.assertTrue("count" in data[0])
+		self.assertEqual(len(data[0]), 2)
 
-			data = frappe.get_list(
-				"Blog Post",
-				fields=["name", "blogger.full_name as blogger_full_name", "blog_category.description"],
-				limit=1,
-			)
-			self.assertTrue("name" in data[0])
-			self.assertTrue("blogger_full_name" in data[0])
-			self.assertTrue("description" not in data[0])  # field does not exist
+		data = frappe.get_list(
+			"Blog Post",
+			fields=["name", "blogger.full_name as blogger_full_name", "blog_category.description"],
+			limit=1,
+		)
+		self.assertTrue("name" in data[0])
+		self.assertTrue("blogger_full_name" in data[0])
+		self.assertTrue("description" not in data[0])  # field does not exist
 
 	def test_reportview_get_permlevel_system_users(self):
 		with setup_patched_blog_post(), setup_test_user(set_user=True):

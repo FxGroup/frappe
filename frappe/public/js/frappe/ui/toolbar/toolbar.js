@@ -48,6 +48,44 @@ frappe.ui.toolbar.Toolbar = class {
 		$('.navbar-toggle-ugly-mode').click(() => {
 			frappe.ui.toolbar.toggle_ugly_mode();
 		});
+		$('#stop-impersonate').click(() => {
+			if (frappe.boot.user.impersonated_by) {
+				frappe.prompt([
+					{
+						fieldname: "password",
+						fieldtype: "Password",
+						label: "Enter Your Password",
+						reqd: 1
+					}
+				], (values) => {
+					frappe.xcall('frappe.core.doctype.user.user.stop_impersonate', {
+						user: frappe.boot.user.impersonated_by,
+						password: values.password,
+						permission: 1
+					})
+					.then(() => {
+						const $impersonationElements = $('.indicator-pill').filter(function() {
+							return $(this).attr('id') === 'stop-impersonate' || 
+								   $(this).text().includes('Impersonating');
+						});
+						$impersonationElements.remove();
+						window.location.reload();
+					})
+					.catch((error) => {
+						frappe.msgprint({
+							title: __('Error'),
+							indicator: 'red',
+							message: __('Failed to revert to original user: ') + error.message
+						});
+					});
+				}, "Password Required", "Submit");
+			} else {
+				frappe.msgprint({
+					title: __('Warning'),
+					message: __('Not currently impersonating any user')
+				});
+			}
+		});
 	}
 
 	setup_announcement_widget() {
@@ -326,4 +364,44 @@ frappe.ui.toolbar.setup_session_defaults = function () {
 			);
 		},
 	});
+};
+
+
+frappe.ui.toolbar.setup_impersonation = function () {
+    frappe.prompt(
+        [
+            {
+                fieldname: "user",
+                fieldtype: "Link",
+                options: "User",
+                label: "Select User to Impersonate",
+                reqd: 1,
+                get_query: () => {
+                    return {
+                        filters: {
+                            enabled: 1,
+							name: ["!=", frappe.session.user]
+                        },
+                    };
+                },
+            },
+        ],
+        (values) => {
+            frappe.xcall("frappe.core.doctype.user.user.impersonate", {
+                user: values.user,
+            })
+                .then(() => {
+                    window.location.reload();
+                })
+                .catch((error) => {
+                    frappe.msgprint({
+                        title: __("Error"),
+                        indicator: "red",
+                        message: __("Failed to impersonate user: ") + error.message,
+                    });
+                });
+        },
+        __("Impersonate User"),
+        __("Impersonate")
+    );
 };

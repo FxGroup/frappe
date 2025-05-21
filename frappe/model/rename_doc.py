@@ -233,8 +233,18 @@ def rename_doc(
 
 
 def update_assignments(old: str, new: str, doctype: str) -> None:
-	old_assignments = frappe.parse_json(frappe.db.get_value(doctype, old, "_assign")) or []
-	new_assignments = frappe.parse_json(frappe.db.get_value(doctype, new, "_assign")) or []
+	old_assignments = frappe.db.get_value(doctype, old, "_assign")
+	new_assignments = frappe.db.get_value(doctype, new, "_assign")
+	if not old_assignments:
+		old_assignments = []
+	else:
+		old_assignments = frappe.parse_json(old_assignments)
+	
+	if not new_assignments:
+		new_assignments = []
+	else:
+		new_assignments = frappe.parse_json(new_assignments)
+
 	common_assignments = list(set(old_assignments).intersection(new_assignments))
 
 	for user in common_assignments:
