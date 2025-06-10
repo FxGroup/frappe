@@ -126,7 +126,7 @@ frappe.Application = class Application {
 		frappe.realtime.on("version-update", function () {
 			var dialog = frappe.msgprint({
 				message: __(
-					"The application has been updated to a new version, please refresh this page"
+					"The application has been updated to a new version, please refresh all pages when possible."
 				),
 				indicator: "green",
 				title: __("Version Updated"),
