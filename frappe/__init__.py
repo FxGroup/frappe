@@ -11,7 +11,6 @@ be used to build database driven apps.
 Read the documentation: https://frappeframework.com/docs
 """
 
-import copy
 import faulthandler
 import functools
 import gc
@@ -52,7 +51,7 @@ from .utils.jinja import (
 )
 from .utils.lazy_loader import lazy_import
 
-__version__ = "15.59.0"
+__version__ = "15.69.3"
 __title__ = "Frappe Framework"
 
 # This if block is never executed when running the code. It is only used for
@@ -314,6 +313,9 @@ def connect_replica() -> bool:
 	# swap db connections
 	local.primary_db = local.db
 	local.db = local.replica_db
+
+	if hasattr(frappe.local, "_recorder"):
+		frappe.local._recorder._patch_sql(local.db)
 
 	return True
 
@@ -708,6 +710,7 @@ def sendmail(
 	print_letterhead=False,
 	with_container=False,
 	email_read_tracker_url=None,
+	x_priority: Literal[1, 3, 5] = 3,
 ) -> Optional["EmailQueue"]:
 	"""Send email using user's default **Email Account** or global default **Email Account**.
 
@@ -735,6 +738,7 @@ def sendmail(
 	:param args: Arguments for rendering the template
 	:param header: Append header in email
 	:param with_container: Wraps email inside a styled container
+	:param x_priority: 1 = HIGHEST, 3 = NORMAL, 5 = LOWEST
 	"""
 
 	if recipients is None:
@@ -790,6 +794,7 @@ def sendmail(
 		print_letterhead=print_letterhead,
 		with_container=with_container,
 		email_read_tracker_url=email_read_tracker_url,
+		x_priority=x_priority,
 	)
 
 	# build email queue and send the email if send_now is True.
@@ -856,7 +861,7 @@ def is_whitelisted(method):
 
 	is_guest = session["user"] == "Guest"
 	if method not in whitelisted or is_guest and method not in guest_methods:
-		summary = _("You are not permitted to access this resource.")
+		summary = _("You are not permitted to access this resource. Login to access")
 		detail = _("Function {0} is not whitelisted.").format(bold(f"{method.__module__}.{method.__name__}"))
 		msg = f"<details><summary>{summary}</summary>{detail}</details>"
 		throw(msg, PermissionError, title=_("Method Not Allowed"))
@@ -1693,14 +1698,22 @@ def get_file_json(path):
 		return json.load(f)
 
 
-def read_file(path, raise_not_found=False):
-	"""Open a file and return its content as Unicode."""
+def read_file(path, raise_not_found=False, as_base64=False):
+	"""Open a file and return its content as Unicode or Base64 string."""
 	if isinstance(path, str):
 		path = path.encode("utf-8")
 
 	if os.path.exists(path):
-		with open(path) as f:
-			return as_unicode(f.read())
+		if as_base64:
+			import base64
+
+			with open(path, "rb") as f:
+				content = f.read()
+				return base64.b64encode(content).decode("utf-8")
+		else:
+			with open(path) as f:
+				content = f.read()
+				return as_unicode(content)
 	elif raise_not_found:
 		raise OSError(f"{path} Not Found")
 	else:
@@ -2101,52 +2114,6 @@ def format(*args, **kwargs):
 	return frappe.utils.formatters.format_value(*args, **kwargs)
 
 
-def get_print(
-	doctype=None,
-	name=None,
-	print_format=None,
-	style=None,
-	as_pdf=False,
-	doc=None,
-	output=None,
-	no_letterhead=0,
-	password=None,
-	pdf_options=None,
-	letterhead=None,
-):
-	"""Get Print Format for given document.
-
-	:param doctype: DocType of document.
-	:param name: Name of document.
-	:param print_format: Print Format name. Default 'Standard',
-	:param style: Print Format style.
-	:param as_pdf: Return as PDF. Default False.
-	:param password: Password to encrypt the pdf with. Default None"""
-	from frappe.utils.pdf import get_pdf
-	from frappe.website.serve import get_response_without_exception_handling
-
-	original_form_dict = copy.deepcopy(local.form_dict)
-	try:
-		local.form_dict.doctype = doctype
-		local.form_dict.name = name
-		local.form_dict.format = print_format
-		local.form_dict.style = style
-		local.form_dict.doc = doc
-		local.form_dict.no_letterhead = no_letterhead
-		local.form_dict.letterhead = letterhead
-
-		pdf_options = pdf_options or {}
-		if password:
-			pdf_options["password"] = password
-
-		response = get_response_without_exception_handling("printview", 200)
-		html = str(response.data, "utf-8")
-	finally:
-		local.form_dict = original_form_dict
-
-	return get_pdf(html, options=pdf_options, output=output) if as_pdf else html
-
-
 def attach_print(
 	doctype,
 	name,
@@ -2318,11 +2285,15 @@ def logger(module=None, with_more_info=False, allow_site=True, filter=None, max_
 	)
 
 
-def get_desk_link(doctype, name):
+def get_desk_link(doctype, name, show_title_with_name=False):
 	meta = get_meta(doctype)
 	title = get_value(doctype, name, meta.get_title_field())
 
-	html = '<a href="/app/Form/{doctype}/{name}" style="font-weight: bold;">{doctype_local} {title_local}</a>'
+	if show_title_with_name and name != title:
+		html = '<a href="/app/Form/{doctype}/{name}" style="font-weight: bold;">{doctype_local} {name}: {title_local}</a>'
+	else:
+		html = '<a href="/app/Form/{doctype}/{name}" style="font-weight: bold;">{doctype_local} {title_local}</a>'
+
 	return html.format(doctype=doctype, name=name, doctype_local=_(doctype), title_local=_(title))
 
 
@@ -2501,7 +2472,14 @@ def _register_fault_handler():
 		faulthandler.register(signal.SIGUSR1, file=sys.__stderr__)
 
 
+def override_whitelisted_method(original_method: str) -> str:
+	"""Return the last override or the original whitelisted method."""
+	overrides = get_hooks("override_whitelisted_methods", {}).get(original_method, [])
+	return overrides[-1] if overrides else original_method
+
+
 from frappe.utils.error import log_error
+from frappe.utils.print_utils import get_print
 
 if _tune_gc:
 	# generational GC gets triggered after certain allocs (g0) which is 700 by default.

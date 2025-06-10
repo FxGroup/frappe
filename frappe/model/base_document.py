@@ -338,7 +338,7 @@ class BaseDocument:
 			elif type(posting_date) is datetime.datetime:
 				posting_date = posting_date.date()
 
-			batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date)
+			batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date + relativedelta(days=7))
 			batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
 
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
@@ -1434,11 +1434,11 @@ class BaseDocument:
 	def cast(self, value, df):
 		return cast_fieldtype(df.fieldtype, value, show_warning=False)
 
-	def _extract_images_from_editor(self):
+	def _extract_images_from_text_editor(self):
 		from frappe.core.doctype.file.utils import extract_images_from_doc
 
 		if self.doctype != "DocType":
-			for df in self.meta.get("fields", {"fieldtype": ("in", ("Text Editor", "HTML Editor"))}):
+			for df in self.meta.get("fields", {"fieldtype": ("=", "Text Editor")}):
 				extract_images_from_doc(self, df.fieldname)
 
 

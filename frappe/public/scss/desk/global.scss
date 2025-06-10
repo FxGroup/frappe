@@ -711,6 +711,7 @@ details > summary:focus {
 		bottom: var(--wrap-padding);
 		left: var(--wrap-padding);
 		right: var(--wrap-padding);
+		pointer-events: none;
 	}
 }
 

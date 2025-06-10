@@ -154,11 +154,13 @@ class DocType(Document):
 		]
 		nsm_parent_field: DF.Data | None
 		permissions: DF.Table[DocPerm]
+		protect_attached_files: DF.Check
 		queue_in_background: DF.Check
 		quick_entry: DF.Check
 		read_only: DF.Check
 		restrict_to_domain: DF.Link | None
 		route: DF.Data | None
+		row_format: DF.Literal["Dynamic", "Compressed"]
 		search_fields: DF.Data | None
 		sender_field: DF.Data | None
 		sender_name_field: DF.Data | None
@@ -336,7 +338,7 @@ class DocType(Document):
 		if self.is_virtual and self.custom:
 			frappe.throw(_("Not allowed to create custom Virtual DocType."), CannotCreateStandardDoctypeError)
 
-		if frappe.conf.get("developer_mode"):
+		if frappe.conf.developer_mode and not self.owner:
 			self.owner = "Administrator"
 			self.modified_by = "Administrator"
 
