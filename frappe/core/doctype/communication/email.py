@@ -82,6 +82,14 @@ def make(
 
 	if doctype and name:
 		frappe.has_permission(doctype, doc=name, ptype="email", throw=True)
+		if sender == "support@fxmed.co.nz":
+			sender_full_name = "FxMed Support"
+		elif sender == "Support@rnlabs.com.au":
+			sender_full_name = "RNLabs Support"
+		elif sender == "Support@Therahealth.com.au":
+			sender_full_name = "TheraHealth Support"
+		elif sender == "sales@naturalmeds.co.nz":
+			sender_full_name = "NaturalMeds Support"
 
 	return _make(
 		doctype=doctype,
