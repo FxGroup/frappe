@@ -51,7 +51,7 @@ from .utils.jinja import (
 )
 from .utils.lazy_loader import lazy_import
 
-__version__ = "15.69.3"
+__version__ = "15.70.0"
 __title__ = "Frappe Framework"
 
 # This if block is never executed when running the code. It is only used for
@@ -1303,6 +1303,15 @@ def get_doc(*args, **kwargs):
 	import frappe.model.document
 
 	return frappe.model.document.get_doc(*args, **kwargs)
+
+
+def get_single_value(setting: str, fieldname: str, /, *, as_dict: bool = False):
+	"""Return the cached value associated with the given fieldname from single DocType.
+
+	Usage:
+	        telemetry_enabled = frappe.get_single_value("System Settings", "telemetry_enabled")
+	"""
+	return get_cached_value(setting, setting, fieldname=fieldname, as_dict=as_dict)
 
 
 def get_last_doc(doctype, filters=None, order_by="creation desc", *, for_update=False):
