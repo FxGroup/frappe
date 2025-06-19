@@ -14,7 +14,6 @@ from frappe.core.doctype.access_log.access_log import make_access_log
 from frappe.core.doctype.document_share_key.document_share_key import is_expired
 from frappe.utils import cint, escape_html, strip_html
 from frappe.utils.jinja_globals import is_rtl
-from erpnext import get_default_company
 
 if TYPE_CHECKING:
 	from frappe.model.document import Document
