@@ -83,7 +83,7 @@ def new_site(
 	setup_db=True,
 ):
 	"Create a new site"
-	from frappe.installer import _new_site, extract_sql_from_archive
+	from frappe.installer import _new_site
 
 	frappe.init(site=site, new_site=True)
 
