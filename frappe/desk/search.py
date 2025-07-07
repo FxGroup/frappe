@@ -45,6 +45,7 @@ def search_link(
 	searchfield: str | None = None,
 	reference_doctype: str | None = None,
 	ignore_user_permissions: bool = False,
+	order_by: str | None = None
 ) -> list[LinkSearchResults]:
 	results = search_widget(
 		doctype,
@@ -55,8 +56,9 @@ def search_link(
 		filters=filters,
 		reference_doctype=reference_doctype,
 		ignore_user_permissions=ignore_user_permissions,
+		order_by=order_by
 	)
-
+	
 	if doctype == "Batch":
 		return build_batch_content(filters, txt.strip(), results)
 	else:
@@ -77,6 +79,7 @@ def search_widget(
 	as_dict: bool = False,
 	reference_doctype: str | None = None,
 	ignore_user_permissions: bool = False,
+	order_by: str | None = None
 ):
 	start = cint(start)
 
@@ -171,21 +174,22 @@ def search_widget(
 	# Insert title field query after name
 	if meta.show_title_field_in_link and meta.title_field:
 		formatted_fields.insert(1, f"`tab{meta.name}`.{meta.title_field} as `label`")
-
-	order_by_based_on_meta = get_order_by(doctype, meta)
-	# `idx` is number of times a document is referred, check link_count.py
-	order_by = f"`tab{doctype}`.idx desc, {order_by_based_on_meta}"
+	
+	overwrite_order_by = None
+	if not order_by:
+		order_by_based_on_meta = get_order_by(doctype, meta)
+		# `idx` is number of times a document is referred, check link_count.py
+		order_by = f"`tab{doctype}`.idx desc, {order_by_based_on_meta}"
+	else:
+		# Overwriting normal behaviour is orderby is provided explicity.SW
+		overwrite_order_by = f"`tab{doctype}`.{order_by}"
+		order_by = f"{overwrite_order_by}, `tab{doctype}`.idx desc"
 
 	if not meta.translated_doctype:
 		_txt = frappe.db.escape((txt or "").replace("%", "").replace("@", ""))
-		# locate returns 0 if string is not found, convert 0 to null and then sort null to end in order by
 		_relevance = f"(1 / nullif(locate({_txt}, `tab{doctype}`.`name`), 0))"
-		formatted_fields.append(f"""{_relevance} as `_relevance`""")
-		# Since we are sorting by alias postgres needs to know number of column we are sorting
-		if frappe.db.db_type == "mariadb":
-			order_by = f"ifnull(_relevance, -9999) desc, {order_by}"
-		elif frappe.db.db_type == "postgres":
-			# Since we are sorting by alias postgres needs to know number of column we are sorting
+		formatted_fields.append(f"{_relevance} as `_relevance`")
+		if frappe.db.db_type == "postgres":
 			order_by = f"{len(formatted_fields)} desc nulls last, {order_by}"
 
 	ignore_permissions = doctype == "DocType" or (
@@ -222,10 +226,10 @@ def search_widget(
 			)
 		)
 
-	# Sorting the values array so that relevant results always come first
-	# This will first bring elements on top in which query is a prefix of element
-	# Then it will bring the rest of the elements and sort them in lexicographical order
-	values = sorted(values, key=lambda x: relevance_sorter(x, txt, as_dict))
+		# Sorting the values array so that relevant results always come first
+		# This will first bring elements on top in which query is a prefix of element
+		# Then it will bring the rest of the elements and sort them in lexicographical order
+		values = sorted(values, key=lambda x: relevance_sorter(x, txt, as_dict))
 
 	# remove _relevance from results
 	if not meta.translated_doctype:
