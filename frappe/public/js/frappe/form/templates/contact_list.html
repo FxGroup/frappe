@@ -1,90 +1,92 @@
 <div class="clearfix"></div>
 {% for(var i=0, l=contact_list.length; i<l; i++) { %}
-	<div class="address-box">
-		<p class="h6 flex align-center">
-			{%= contact_list[i].first_name %} {%= contact_list[i].last_name %}
-			{% if(contact_list[i].is_primary_contact) { %}
-				<span class="text-muted">&nbsp;({%= __("Primary") %})</span>
-			{% } %}
-			{% if(contact_list[i].designation){ %}
-			 <span class="text-muted">&ndash; {%= contact_list[i].designation %}</span>
-			{% } %}
-			<a
-				href="{%= frappe.utils.get_form_link('Contact', contact_list[i].name) %}"
-				class="btn btn-xs btn-default edit-btn"
-				title="{%= __('Edit') %}"
-			>
-				<svg class="icon icon-xs">
-					<use href="#icon-edit"></use>
-				</svg>
-			</a>
-		</p>
-		{% if (contact_list[i].phones || contact_list[i].email_ids) { %}
-		<p>
-			{% if(contact_list[i].phone) { %}
-				{%= __("Phone") %}: {%= contact_list[i].phone %}<span class="text-muted"> ({%= __("Primary") %})</span><br>
-			{% } %}
-			{% if(contact_list[i].mobile_no) { %}
-				{%= __("Mobile No") %}: {%= contact_list[i].mobile_no %}<span class="text-muted"> ({%= __("Primary") %})</span><br>
-			{% } %}
-			{% if(contact_list[i].phone_nos) { %}
-				{% for(var j=0, k=contact_list[i].phone_nos.length; j<k; j++) { %}
-					{%= __("Phone") %}: {%= contact_list[i].phone_nos[j].phone %}<br>
+	{% if (!contact_list[i].disabled) { %}
+		<div class="address-box">
+			<p class="h6 flex align-center">
+				{%= contact_list[i].first_name %} {%= contact_list[i].last_name %}
+				{% if(contact_list[i].is_primary_contact) { %}
+					<span class="text-muted">&nbsp;({%= __("Primary") %})</span>
 				{% } %}
-			{% } %}
-		</p>
-		<p>
-			{%
-				var emailMap = {};
-				var contact = contact_list[i];
-				
-				if(contact.email_id) {
-					emailMap[contact.email_id] = emailMap[contact.email_id] || [];
-					emailMap[contact.email_id].push('Primary');
-				}
-				
-				if(contact.marketing_email) {
-					emailMap[contact.marketing_email] = emailMap[contact.marketing_email] || [];
-					emailMap[contact.marketing_email].push('Marketing');
-				}
-				
-				if(contact.email_ids) {
-					for(var j=0, k=contact.email_ids.length; j<k; j++) {
-						var emailObj = contact.email_ids[j];
-						emailMap[emailObj.email_id] = emailMap[emailObj.email_id] || [];
-						
-						if(emailObj.is_primary == 1) {
-							emailMap[emailObj.email_id].push('Primary');
-						}
-						if(emailObj.is_marketing == 1) {
-							emailMap[emailObj.email_id].push('Marketing');
+				{% if(contact_list[i].designation){ %}
+				<span class="text-muted">&ndash; {%= contact_list[i].designation %}</span>
+				{% } %}
+				<a
+					href="{%= frappe.utils.get_form_link('Contact', contact_list[i].name) %}"
+					class="btn btn-xs btn-default edit-btn"
+					title="{%= __('Edit') %}"
+				>
+					<svg class="icon icon-xs">
+						<use href="#icon-edit"></use>
+					</svg>
+				</a>
+			</p>
+			{% if (contact_list[i].phones || contact_list[i].email_ids) { %}
+			<p>
+				{% if(contact_list[i].phone) { %}
+					{%= __("Phone") %}: {%= contact_list[i].phone %}<span class="text-muted"> ({%= __("Primary") %})</span><br>
+				{% } %}
+				{% if(contact_list[i].mobile_no) { %}
+					{%= __("Mobile No") %}: {%= contact_list[i].mobile_no %}<span class="text-muted"> ({%= __("Primary") %})</span><br>
+				{% } %}
+				{% if(contact_list[i].phone_nos) { %}
+					{% for(var j=0, k=contact_list[i].phone_nos.length; j<k; j++) { %}
+						{%= __("Phone") %}: {%= contact_list[i].phone_nos[j].phone %}<br>
+					{% } %}
+				{% } %}
+			</p>
+			<p>
+				{%
+					var emailMap = {};
+					var contact = contact_list[i];
+					
+					if(contact.email_id) {
+						emailMap[contact.email_id] = emailMap[contact.email_id] || [];
+						emailMap[contact.email_id].push('Primary');
+					}
+					
+					if(contact.marketing_email) {
+						emailMap[contact.marketing_email] = emailMap[contact.marketing_email] || [];
+						emailMap[contact.marketing_email].push('Marketing');
+					}
+					
+					if(contact.email_ids) {
+						for(var j=0, k=contact.email_ids.length; j<k; j++) {
+							var emailObj = contact.email_ids[j];
+							emailMap[emailObj.email_id] = emailMap[emailObj.email_id] || [];
+							
+							if(emailObj.is_primary == 1) {
+								emailMap[emailObj.email_id].push('Primary');
+							}
+							if(emailObj.is_marketing == 1) {
+								emailMap[emailObj.email_id].push('Marketing');
+							}
 						}
 					}
-				}
-				
-				for(var email in emailMap) {
-					var tags = emailMap[email];
-					var uniqueTags = [];
-					for(var t=0; t<tags.length; t++) {
-						if(uniqueTags.indexOf(tags[t]) === -1) {
-							uniqueTags.push(tags[t]);
+					
+					for(var email in emailMap) {
+						var tags = emailMap[email];
+						var uniqueTags = [];
+						for(var t=0; t<tags.length; t++) {
+							if(uniqueTags.indexOf(tags[t]) === -1) {
+								uniqueTags.push(tags[t]);
+							}
 						}
-					}
-			%}
-				{%= __("Email") %}: {%= email %}
-				{% if(uniqueTags.length > 0) { %}
-					<span class="text-muted"> ({%= uniqueTags.join(') (') %})</span>
+				%}
+					{%= __("Email") %}: {%= email %}
+					{% if(uniqueTags.length > 0) { %}
+						<span class="text-muted"> ({%= uniqueTags.join(') (') %})</span>
+					{% } %}
+					<br>
 				{% } %}
-				<br>
+			</p>
 			{% } %}
-		</p>
-		{% } %}
-		<p>
-		{% if (contact_list[i].address) { %}
-			{%= __("Address") %}: {%= contact_list[i].address %}<br>
-		{% } %}
-		</p>
-	</div>
+			<p>
+			{% if (contact_list[i].address) { %}
+				{%= __("Address") %}: {%= contact_list[i].address %}<br>
+			{% } %}
+			</p>
+		</div>
+	{% } %}
 {% } %}
 {% if(!contact_list.length) { %}
 <p class="text-muted small">{%= __("No contacts added yet.") %}</p>
