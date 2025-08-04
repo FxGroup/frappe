@@ -294,7 +294,7 @@ class BaseDocument:
 	def parent_doc(self):
 		self._parent_doc = None
 	
-	def append_item_with_batch(self, key, value, shortdated_first = True, single_type_only = False, throw = False, partial_fulfillment = True, specific_batch = None):
+	def append_item_with_batch(self, key, value, shortdated_first = True, single_type_only = False, throw = False, partial_fulfillment = True, specific_batch = None, ignore_reserved=True):
 		"""
 		self: This Doc
 		key: Document field appending to
@@ -313,6 +313,7 @@ class BaseDocument:
 		import copy
 		append_list = []
 		idx_list = []
+		# Handle no batch number items.
 		if not self.get("update_stock", True) or not frappe.get_value("Item", value['item_code'], "has_batch_no"):
 			value_copy = copy.copy(value)
 			if self.get("update_stock", True) and "actual_qty" in value and value['qty'] > value['actual_qty']:
@@ -323,9 +324,9 @@ class BaseDocument:
 			else:
 				append_list.append(value)
 				success = True
-
 		else:
 			from erpnext.stock.doctype.batch.batch import get_batches_by_oldest 
+			from fxnmrnth.utils.batch_reservation import get_batches_by_oldest_with_reservation
 
 			from dateutil.relativedelta import relativedelta
 			if not value.get('warehouse'):
@@ -333,28 +334,47 @@ class BaseDocument:
 			posting_date = frappe.utils.today()
 			if self.get("posting_date"):
 				posting_date = self.get("posting_date")
+			# frappe inconsistently sends date data.
 			if type(posting_date) is str:
 				posting_date = datetime.datetime.strptime(posting_date, "%Y-%m-%d").date()
 			elif type(posting_date) is datetime.datetime:
 				posting_date = posting_date.date()
-
-			batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date + relativedelta(days=7))
-			batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
-
+			if ignore_reserved:
+				# Take batch info direct
+				# We grab next weeks batch data as future orders can take up batch qty which is not reflected when getting todays data
+				# Meaning todays batch allocation would cause there to not be enough stock left for the future
+				# causing order to fail. 
+				batches = get_batches_by_oldest(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date + relativedelta(days=7))
+				batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
+			else:
+				# Take batch info and check whats assigned to future or draft orders
+				base_batches = get_batches_by_oldest_with_reservation(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date)
+				batches = copy.copy(base_batches)
+				batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["remaining_qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
+				batch_names = [x["batch_id"] for x in batches]
+			
+			# Take out disabled batches
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
 			if specific_batch:
 				batches = [batch for batch in batches if batch['batch_id'] == specific_batch]
+
+			# Remove from batch qty any stock thats been assigned.
 			for item in self.get(key):
 				if item.get("batch_no") and item.get("item_code") == value['item_code']:
 					for batch in batches:
 						if batch["batch_id"] == item.get("batch_no"):
 							batch["qty"] -= item.get("qty")
-
+			# Split batches to longdated (normal) and shortdated batches.
 			expiry_date = int(frappe.get_value("Item", value['item_code'], "shortdated_timeframe_in_months"))
 			expiry_cutoff = posting_date + relativedelta(months=expiry_date)
 			shortdated_batches = [i for i in batches if i["expiry_date"] and i["expiry_date"] <= expiry_cutoff and i["disabled"] == 0]
 			normal_batches = [i for i in batches if not i["expiry_date"] or i["expiry_date"] > expiry_cutoff and i["disabled"] == 0]
 			def assign_to_batch(current_batch, batches, shortdated):
+				"""
+				Function to assign an item to batch. 
+				If qty is greater than batch we can add item on directly.
+				If its not then we take what we can and remove batch from selection as its out of stock.
+				"""
 				if value['qty'] > current_batch['qty']:
 					value_copy['qty'] = current_batch['qty']
 					value['qty'] -= value_copy['qty']
@@ -367,6 +387,12 @@ class BaseDocument:
 					value_copy['shortdated_batch'] = shortdated
 				append_list.append(value_copy)
 			def try_batch(batches, shortdated):
+				"""
+					Function to wrap around assign_to_batch
+					We keep trying to add to batch up until there are no longer batches left.
+					If single_type_only is enabled we then fail as there is not enough stock to allocate.
+					If single_type_only is enabled we tell the function to swap to the other type of stock
+				"""
 				if batches:
 					assign_to_batch(batches[0], batches, shortdated)
 					return ["Repeat", value]
@@ -384,6 +410,8 @@ class BaseDocument:
 							return ["Failed", value]
 					else:
 						return ["Continue", value]
+			# While theres stock to allocate and theres batches left we continue trying to assign batches. 
+			# Swapping to the lower priority stock type if main type of stock is out of qty, if we are allowed to.
 			while value['qty'] > 0 and (shortdated_batches or normal_batches):
 				value_copy = copy.copy(value)
 				if shortdated_first == True:
@@ -414,11 +442,19 @@ class BaseDocument:
 					success = False
 			else:
 				success = True
+					
 		if success or partial_fulfillment:
 			for item in append_list:
 				if item['qty'] > 0:
+					# if not ignore_reserved:
+					# 	for batch in base_batches:
+					# 		if batch["batch_no"] in item["batch_no"]:
+					# 			batch["reserved_qty"] += item["qty"]
+					# 			batch["remaining_qty"] -= item["qty"]
 					self.append("items", item)
 					idx_list.append(self.items[-1].idx)
+			# if not ignore_reserved:
+			# set_batch_reservation_cache_temp(batch_info = base_batches, item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date, customer=self.customer)
 		return [success, value, idx_list]
 
 	def extend(self, key, value):
