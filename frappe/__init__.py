@@ -51,7 +51,7 @@ from .utils.jinja import (
 )
 from .utils.lazy_loader import lazy_import
 
-__version__ = "15.72.3"
+__version__ = "15.75.0"
 __title__ = "Frappe Framework"
 
 # This if block is never executed when running the code. It is only used for
@@ -1793,7 +1793,7 @@ def get_newargs(fn: Callable, kwargs: dict[str, Any]) -> dict[str, Any]:
 
 
 def make_property_setter(
-	args, ignore_validate=False, validate_fields_for_doctype=True, is_system_generated=True
+	args, ignore_validate=False, validate_fields_for_doctype=True, is_system_generated=True, *, module=None
 ):
 	"""Create a new **Property Setter** (for overriding DocType and DocField properties).
 
@@ -1832,6 +1832,7 @@ def make_property_setter(
 				"doctype": "Property Setter",
 				"doctype_or_field": args.doctype_or_field,
 				"doc_type": doctype,
+				"module": module,
 				"field_name": args.fieldname,
 				"row_name": args.row_name,
 				"property": args.property,
