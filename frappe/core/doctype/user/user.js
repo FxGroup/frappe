@@ -85,7 +85,7 @@ frappe.ui.form.on("User", {
 		if (
 			frm.can_edit_roles &&
 			!frm.is_new() &&
-			["System User", "Website User"].includes(frm.doc.user_type)
+			["System User", "Website User", "System Support"].includes(frm.doc.user_type)
 		) {
 			if (!frm.roles_editor) {
 				const role_area = $('<div class="role-editor">').appendTo(
@@ -120,7 +120,7 @@ frappe.ui.form.on("User", {
 		}
 
 		if (
-			["System User", "Website User"].includes(frm.doc.user_type) &&
+			["System User", "Website User", "System Support"].includes(frm.doc.user_type) &&
 			!frm.is_new() &&
 			!frm.roles_editor &&
 			frm.can_edit_roles
@@ -423,12 +423,16 @@ function has_access_to_edit_user() {
 }
 
 function get_roles_for_editing_user() {
-	return (
-		frappe
-			.get_meta("User")
-			.permissions.filter((perm) => perm.permlevel >= 1 && perm.write)
-			.map((perm) => perm.role) || ["System Manager"]
-	);
+	let roles = frappe
+		.get_meta("User")
+		.permissions.filter((perm) => perm.permlevel >= 1 && perm.write)
+		.map((perm) => perm.role) || ["System Manager"];
+
+	if (!roles.includes("System Support")) {
+		roles.push("System Support");
+	}
+
+	return roles;
 }
 
 function show_api_key_dialog(api_key, api_secret) {
