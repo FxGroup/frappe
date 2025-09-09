@@ -318,7 +318,7 @@ def build_batch_content(filters, txt, res):
 		(batch.name LIKE "%{txt}%" or batch.item LIKE "%{txt}%" or batch.item_name LIKE "%{txt}%") AND 
 		batch.disabled = 0
 	ORDER BY 
-		batch.creation DESC
+		batch.expiry_date DESC, batch_qty
 	""", as_dict=True)
 
 	results = []
