@@ -60,7 +60,7 @@ def search_link(
 	)
 	
 	if doctype == "Batch":
-		return build_batch_content(filters, txt.strip(), results)
+		return build_batch_content(filters, txt.strip(), results, reference_doctype)
 	else:
 		return build_for_autosuggest(results, doctype=doctype)
 
@@ -284,7 +284,7 @@ def build_for_autosuggest(res: list[tuple], doctype: str) -> list[LinkSearchResu
 
 	return results
 
-def build_batch_content(filters, txt, res):
+def build_batch_content(filters, txt, res, reference_doctype):
 	if filters:
 		filters = json.loads(filters)
 
@@ -303,6 +303,9 @@ def build_batch_content(filters, txt, res):
 			qty = filters['batch_qty']
 			item_filter += "batch_qty = 0 AND " if not qty else "batch_qty > 0 AND "
 
+	if reference_doctype and reference_doctype == 'Sales Invoice Item':
+		item_filter += "batch.expiry_date >= CURDATE() AND "
+
 	res = frappe.db.sql(f"""
 	SELECT 
 		batch.name as "name", batch.expiry_date, batch.batch_qty, item.shortdated_timeframe_in_months
@@ -318,7 +321,7 @@ def build_batch_content(filters, txt, res):
 		(batch.name LIKE "%{txt}%" or batch.item LIKE "%{txt}%" or batch.item_name LIKE "%{txt}%") AND 
 		batch.disabled = 0
 	ORDER BY 
-		batch.expiry_date DESC, batch_qty
+		batch.expiry_date, batch_qty
 	""", as_dict=True)
 
 	results = []
