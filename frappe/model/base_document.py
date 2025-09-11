@@ -339,6 +339,11 @@ class BaseDocument:
 				posting_date = datetime.datetime.strptime(posting_date, "%Y-%m-%d").date()
 			elif type(posting_date) is datetime.datetime:
 				posting_date = posting_date.date()
+			# Get Posting Time
+			posting_time = datetime.datetime.now().time()
+			if self.get("posting_time"):
+				posting_time = self.get("posting_time")
+
 			if ignore_reserved:
 				# Take batch info direct
 				# We grab next weeks batch data as future orders can take up batch qty which is not reflected when getting todays data
@@ -348,7 +353,7 @@ class BaseDocument:
 				batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
 			else:
 				# Take batch info and check whats assigned to future or draft orders
-				base_batches = get_batches_by_oldest_with_reservation(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date)
+				base_batches = get_batches_by_oldest_with_reservation(item_code=value['item_code'], warehouse=value['warehouse'], posting_date=posting_date, posting_time=posting_time)
 				batches = copy.copy(base_batches)
 				batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["remaining_qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
 				batch_names = [x["batch_id"] for x in batches]
