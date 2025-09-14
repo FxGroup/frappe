@@ -304,7 +304,7 @@ def build_batch_content(filters, txt, res, reference_doctype):
 			item_filter += "batch_qty = 0 AND " if not qty else "batch_qty > 0 AND "
 
 	if reference_doctype and reference_doctype == 'Sales Invoice Item':
-		item_filter += "batch.expiry_date >= CURDATE() AND "
+		item_filter += "batch.expiry_date >= CURDATE() AND batch.batch_qty <> 0 AND"
 
 	res = frappe.db.sql(f"""
 	SELECT 
