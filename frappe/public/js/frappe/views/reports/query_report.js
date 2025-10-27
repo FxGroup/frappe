@@ -815,7 +815,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 				label: __("Generate New Report"),
 				click: () => {
 					this.show_warning_or_generate_report();
-					this.toggle_message(true, "Generating the report in the background, Please wait.")
+					this.toggle_message(true, "Generating the report in the background, Please wait...")
 				},
 			},
 			Edit: {
@@ -955,7 +955,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 					__("Report initiated, click to view status") +
 					`</a>`;
 				frappe.show_alert({ message: alert_message, indicator: "orange" }, 10);
-				this.toggle_message(true, "Generating the report in the background, Please wait.")
+				this.toggle_message(true, "Generating the report in the background, Please wait...")
 				this.toggle_nothing_to_show(true);
 			});
 		}
@@ -2072,7 +2072,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 	}
 
 	toggle_message(flag, message) {
-		if (this.prepared_report_doc_name && message == "This is a background report. Please set the appropriate filters and then generate a new one.") message = "Generating the report in the background, Please wait.";
+		if (this.prepared_report_doc_name && message == "This is a background report. Please set the appropriate filters and then generate a new one.") message = "Generating the report in the background, Please wait...";
 		if (flag) {
 			this.$message.find("div").html(message);
 			this.$message.show();
