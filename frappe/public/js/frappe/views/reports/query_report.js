@@ -1596,10 +1596,21 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 					visible_idx.push(visible_idx.length);
 				}
 
+				const cleaned_custom_columns = this.custom_columns?.length
+					? this.custom_columns.map((col) => {
+							const cleaned_col = { ...col };
+							if (cleaned_col.link_field && cleaned_col.link_field.names instanceof Set) {
+								cleaned_col.link_field = {
+									fieldname: cleaned_col.link_field.fieldname,
+								};
+							}
+							return cleaned_col;
+					  })
+					: [];
 				const args = {
 					cmd: "frappe.desk.query_report.export_query",
 					report_name: this.report_name,
-					custom_columns: this.custom_columns?.length ? this.custom_columns : [],
+					custom_columns: cleaned_custom_columns,
 					file_format_type: file_format,
 					filters: filters,
 					applied_filters: applied_filters,
@@ -1801,12 +1812,15 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 								(column) => column.label === values.insert_after
 							);
 
-							custom_columns.push({
-								fieldname: this.columns
+							const custom_fieldname = this.columns
 									.map((column) => column.fieldname)
 									.includes(df.fieldname)
 									? df.fieldname + "-" + frappe.scrub(values.doctype)
-									: df.fieldname,
+									: df.fieldname;
+
+							custom_columns.push({
+								fieldname: custom_fieldname,
+								id: custom_fieldname,  // Add id property for export compatibility
 								fieldtype: df.fieldtype,
 								label: df.label,
 								insert_after_index: insert_after_index,
@@ -1968,17 +1982,44 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 			})
 		);
 
+		// Build doctype_field_map, preferring fields that likely contain IDs
+		// When multiple Link fields point to the same doctype, use the one that's more likely to be the ID field
 		doctypes.forEach((doc) => {
-			this.doctype_field_map[doc.doctype] = { fieldname: doc.fieldname, names: new Set() };
+			if (!this.doctype_field_map[doc.doctype]) {
+				this.doctype_field_map[doc.doctype] = { fieldname: doc.fieldname, names: new Set() };
+			} else {
+				// If this doctype already exists, check if the new field is better
+				// Prefer shorter fieldnames or fieldnames that match common ID patterns
+				const existing_field = this.doctype_field_map[doc.doctype].fieldname;
+				const new_field = doc.fieldname;
+
+				// Prefer fields without '_name' suffix, or shorter fieldnames
+				const existing_is_name = existing_field.includes('_name');
+				const new_is_name = new_field.includes('_name');
+
+				if (existing_is_name && !new_is_name) {
+					// Replace with better field
+					this.doctype_field_map[doc.doctype] = { fieldname: new_field, names: new Set() };
+				} else if (!existing_is_name && !new_is_name && new_field.length < existing_field.length) {
+					// Both are potential ID fields, prefer shorter one
+					this.doctype_field_map[doc.doctype] = { fieldname: new_field, names: new Set() };
+				}
+			}
 		});
 
 		this.data.forEach((row) => {
-			doctypes.forEach((doc) => {
-				this.doctype_field_map[doc.doctype].names.add(row[doc.fieldname]);
+			Object.keys(this.doctype_field_map).forEach((doctype) => {
+				const fieldname = this.doctype_field_map[doctype].fieldname;
+				if (row[fieldname]) {
+					this.doctype_field_map[doctype].names.add(row[fieldname]);
+				}
 			});
 		});
 
-		return doctypes;
+		return Object.keys(this.doctype_field_map).map(doctype => ({
+			doctype: doctype,
+			fieldname: this.doctype_field_map[doctype].fieldname
+		}));
 	}
 
 	setup_report_wrapper() {
