@@ -336,17 +336,8 @@ def handle_exception(e):
 	return_as_message = False
 	accept_header = frappe.get_request_header("Accept") or ""
 	respond_as_json = (
-		frappe.get_request_header("Accept")
-		and (frappe.local.is_ajax or "application/json" in accept_header)
-		or (frappe.local.request.path.startswith("/api/") and not accept_header.startswith("text"))
-	)
-	allow_traceback = frappe.get_system_settings("allow_error_traceback") if frappe.db else False
-
-	if not frappe.session.user:
-		# If session creation fails then user won't be unset. This causes a lot of code that
-		# assumes presence of this to fail. Session creation fails => guest or expired login
-		# usually.
-		frappe.session.user = "Guest"
+		frappe.get_request_header("Accept") and (frappe.local.is_ajax or "application/json" in accept_header)
+	) or (frappe.local.request.path.startswith("/api/") and not accept_header.startswith("text"))
 
 	allow_traceback = frappe.get_system_settings("allow_error_traceback") if frappe.db else False
 
@@ -404,7 +395,7 @@ def handle_exception(e):
 	else:
 		traceback = "<pre>" + escape_html(frappe.get_traceback()) + "</pre>"
 		# disable traceback in production if flag is set
-		if frappe.local.flags.disable_traceback or not allow_traceback and not frappe.local.dev_server:
+		if frappe.local.flags.disable_traceback or (not allow_traceback and not frappe.local.dev_server):
 			traceback = ""
 
 		frappe.respond_as_web_page(

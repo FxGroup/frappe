@@ -51,7 +51,7 @@ from .utils.jinja import (
 )
 from .utils.lazy_loader import lazy_import
 
-__version__ = "15.76.0"
+__version__ = "15.88.0"
 __title__ = "Frappe Framework"
 
 # This if block is never executed when running the code. It is only used for
@@ -863,7 +863,7 @@ def is_whitelisted(method):
 	from frappe.utils import sanitize_html
 
 	is_guest = session["user"] == "Guest"
-	if method not in whitelisted or is_guest and method not in guest_methods:
+	if method not in whitelisted or (is_guest and method not in guest_methods):
 		summary = _("You are not permitted to access this resource. Login to access")
 		detail = _("Function {0} is not whitelisted.").format(bold(f"{method.__module__}.{method.__name__}"))
 		msg = f"<details><summary>{summary}</summary>{detail}</details>"
@@ -1559,8 +1559,8 @@ def get_installed_apps(*, _ensure_on_bench=False) -> list[str]:
 
 
 def get_doc_hooks():
-	"""Returns hooked methods for given doc. It will expand the dict tuple if required."""
-	if not hasattr(local, "doc_events_hooks"):
+	"""Return hooked methods for given doc. Expand the dict tuple if required."""
+	if not getattr(local, "doc_events_hooks", None):
 		hooks = get_hooks("doc_events", {})
 		out = {}
 		for key, value in hooks.items():
@@ -2298,16 +2298,30 @@ def logger(module=None, with_more_info=False, allow_site=True, filter=None, max_
 	)
 
 
-def get_desk_link(doctype, name, show_title_with_name=False):
+def get_desk_link(doctype, name, show_title_with_name=False, open_in_new_tab=False):
+	from urllib.parse import quote
+
 	meta = get_meta(doctype)
 	title = get_value(doctype, name, meta.get_title_field())
 
-	if show_title_with_name and name != title:
-		html = '<a href="/app/Form/{doctype}/{name}" style="font-weight: bold;">{doctype_local} {name}: {title_local}</a>'
-	else:
-		html = '<a href="/app/Form/{doctype}/{name}" style="font-weight: bold;">{doctype_local} {title_local}</a>'
+	target_attr = ' target="_blank"' if open_in_new_tab else ""
 
-	return html.format(doctype=doctype, name=name, doctype_local=_(doctype), title_local=_(title))
+	# encode for href
+	encoded_name = quote(name)
+
+	if show_title_with_name and name != title:
+		html = '<a href="/app/Form/{doctype}/{encoded_name}"{target} style="font-weight: bold;">{doctype_local} {name}: {title_local}</a>'
+	else:
+		html = '<a href="/app/Form/{doctype}/{encoded_name}"{target} style="font-weight: bold;">{doctype_local} {title_local}</a>'
+
+	return html.format(
+		doctype=doctype,
+		name=name,
+		encoded_name=encoded_name,
+		doctype_local=_(doctype),
+		title_local=_(title),
+		target=target_attr,
+	)
 
 
 def bold(text):
@@ -2407,7 +2421,13 @@ def is_setup_complete():
 	if not frappe.db.table_exists("Installed Application"):
 		return is_setup_complete
 
-	if all(frappe.get_all("Installed Application", {"has_setup_wizard": 1}, pluck="is_setup_complete")):
+	if all(
+		frappe.get_all(
+			"Installed Application",
+			{"app_name": ("in", ["frappe", "erpnext"])},
+			pluck="is_setup_complete",
+		)
+	):
 		is_setup_complete = True
 
 	return is_setup_complete
