@@ -1447,16 +1447,20 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 		});
 	}
 
-	print_report(print_settings) {
-		const custom_format = this.report_settings.html_format || null;
+	async print_report(print_settings) {
+		let custom_format = this.report_settings.html_format || null;
 		const filters_html = this.get_filters_html_for_print();
 		const landscape = print_settings.orientation == "Landscape";
+
+		if (print_settings.report) {
+			custom_format = await this.get_report_print_format(print_settings.report);
+		}
 
 		this.make_access_log("Print", "PDF");
 		frappe.render_grid({
 			template: print_settings.columns ? "print_grid" : custom_format,
 			title: __(this.report_name),
-			subtitle: filters_html,
+			subtitle: print_settings?.include_filters ? filters_html : null,
 			print_settings: print_settings,
 			landscape: landscape,
 			filters: this.get_filter_values(),
@@ -1468,21 +1472,25 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 		});
 	}
 
-	pdf_report(print_settings) {
+	async pdf_report(print_settings) {
 		const base_url = frappe.urllib.get_base_url();
 		const print_css = frappe.boot.print_css;
 		const landscape = print_settings.orientation == "Landscape";
 
-		const custom_format = this.report_settings.html_format || null;
+		let custom_format = this.report_settings.html_format || null;
 		const columns = this.get_columns_for_print(print_settings, custom_format);
 		const data = this.get_data_for_print();
 		const applied_filters = this.get_filter_values();
+
+		if (print_settings.report) {
+			custom_format = await this.get_report_print_format(print_settings.report);
+		}
 
 		const filters_html = this.get_filters_html_for_print();
 		const template = print_settings.columns || !custom_format ? "print_grid" : custom_format;
 		const content = frappe.render_template(template, {
 			title: __(this.report_name),
-			subtitle: filters_html,
+			subtitle: print_settings?.include_filters ? filters_html : null,
 			filters: applied_filters,
 			data: data,
 			original_data: this.data,
@@ -1518,6 +1526,22 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 			print_settings.report_name = `${__(this.report_name)}.pdf`;
 		}
 		frappe.render_pdf(html, print_settings);
+	}
+
+	async get_report_print_format(report_name) {
+		const filters = {
+			name: report_name,
+			disabled: 0,
+		};
+		const r = await frappe.db.get_value("Print Format", filters, ["html", "css"]);
+		if (r && r.message && r.message.html) {
+			const css = r.message.css || "";
+			const html = r.message.html || "";
+			return `<style>${css}</style>${html}`;
+		} else {
+			frappe.msgprint(__("Print Format not found"));
+			return null;
+		}
 	}
 
 	get_filters_html_for_print() {
@@ -1570,6 +1594,8 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 				file_format,
 				include_indentation,
 				include_filters,
+				export_in_background,
+				include_hidden_columns,
 				csv_delimiter,
 				csv_quoting,
 			}) => {
@@ -1619,10 +1645,17 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 					csv_quoting,
 					include_indentation,
 					include_filters,
+					export_in_background,
+					include_hidden_columns,
 				};
-
-				open_url_post(frappe.request.url, args);
-
+				if (export_in_background) {
+					frappe.call({
+						method: args.cmd,
+						args,
+					});
+				} else {
+					open_url_post(frappe.request.url, args);
+				}
 				this.export_dialog.hide();
 			}
 		);
@@ -1710,7 +1743,8 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 						false,
 						(print_settings) => this.print_report(print_settings),
 						this.report_doc.letter_head,
-						this.get_visible_columns()
+						this.get_visible_columns(),
+						true
 					);
 					this.add_portrait_warning(dialog);
 				},
@@ -1724,7 +1758,8 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 						false,
 						(print_settings) => this.pdf_report(print_settings),
 						this.report_doc.letter_head,
-						this.get_visible_columns()
+						this.get_visible_columns(),
+						true
 					);
 
 					this.add_portrait_warning(dialog);
