@@ -165,7 +165,11 @@ frappe.ui.form.ControlData = class ControlData extends frappe.ui.form.ControlInp
 			if (this.change) this.change(e);
 			else {
 				let value = this.get_input_value();
-				this.parse_validate_and_set_in_model(value, e);
+				let last_value = this.last_value || "";
+				
+				if (value !== last_value) {
+					this.parse_validate_and_set_in_model(value, e);
+				}
 			}
 		};
 		this.$input.on("change", change_handler);
