@@ -112,6 +112,62 @@ frappe.ui.form.Attachments = class Attachments {
 		}
 	}
 
+	open_attachment_lightbox(attachment) {
+		const file_url = this.get_file_url(attachment);
+		const name = attachment.file_name || file_url;
+		const ext = (name.split("?")[0].split("#")[0].split(".").pop() || "").toLowerCase();
+
+		const dlg = new frappe.ui.Dialog({
+			title: __("Attachment Preview"),
+			size: "extra-large",
+		});
+
+		// Build preview HTML by type
+		let preview_html = "";
+		const maxH = "75vh";
+
+		if (["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"].includes(ext)) {
+			preview_html = `
+				<div class="text-center">
+					<img src="${file_url}" alt="${frappe.utils.escape_html(name)}"
+						style="max-width:100%; max-height:${maxH}" />
+				</div>`;
+		} else if (["mp4", "webm", "ogv", "mov"].includes(ext)) {
+			preview_html = `
+				<video src="${file_url}" controls style="width:100%; max-height:${maxH}"></video>`;
+		} else if (["mp3", "wav", "ogg", "m4a"].includes(ext)) {
+			preview_html = `
+				<audio src="${file_url}" controls style="width:100%"></audio>`;
+		} else if (ext === "pdf") {
+			// Using iframe ensures toolbar/zoom are available in-browser
+			preview_html = `
+				<iframe src="${file_url}" style="width:100%; height:${maxH}; border:0;"></iframe>`;
+		} else {
+			preview_html = `
+				<div class="text-muted p-3">
+					${__("Preview is not available for this file type.")}
+					<div class="mt-3">
+						<a href="${file_url}" target="_blank" class="btn btn-primary">
+							${__("Open in New Tab")}
+						</a>
+					</div>
+				</div>`;
+		}
+
+		dlg.$body.html(`
+			<div class="mb-2 small text-muted ellipsis" title="${frappe.utils.escape_html(name)}">
+				${frappe.utils.escape_html(name)}
+			</div>
+			${preview_html}
+		`);
+
+		dlg.set_primary_action(__("Download"), () => {
+			window.open(file_url, "_blank");
+		});
+		dlg.show();
+	}
+
+
 	add_attachment(attachment) {
 		var file_name = attachment.file_name;
 		var file_url = this.get_file_url(attachment);

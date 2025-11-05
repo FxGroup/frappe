@@ -64,7 +64,7 @@ frappe.ui.form.setup_user_image_event = function (frm) {
 	// bind click on image_wrapper
 	frm.sidebar.image_wrapper.on(
 		"click",
-		".sidebar-image-change, .sidebar-image-remove",
+		".sidebar-image-change, .sidebar-image-remove, .sidebar-image-zoom",
 		function (e) {
 			let $target = $(e.currentTarget);
 			var field = frm.get_field(frm.meta.image_field);
@@ -75,7 +75,7 @@ frappe.ui.form.setup_user_image_event = function (frm) {
 				field.$input.trigger("attach_doc_image");
 				// close sidebar
 				frm.page.close_sidebar?.();
-			} else {
+			} else if ($target.is(".sidebar-image-remove")) {
 				/// on remove event for a sidebar image wrapper remove attach file.
 				frm.attachments.remove_attachment_by_filename(
 					frm.doc[frm.meta.image_field],
@@ -83,6 +83,34 @@ frappe.ui.form.setup_user_image_event = function (frm) {
 						field.set_value("").then(() => frm.save());
 					}
 				);
+			} else if ($target.is(".sidebar-image-zoom")) {
+				const imgval = frm.doc[frm.meta.image_field];
+				if (!imgval) return;
+
+				// Try to find an existing File attachment
+				const atts = frm.attachments.get_attachments() || [];
+				let att = atts.find(a =>
+					a.file_url === imgval ||
+					a.file_name === imgval ||
+					a.name === imgval
+				);
+
+				// If not found, synthesize a minimal attachment object
+				if (!att) {
+					const deriveName = (u) => {
+						try {
+							const url = new URL(u, window.location.origin);
+							const leaf = url.pathname.split("/").pop();
+							return decodeURIComponent(leaf || u);
+						} catch (e) {
+							return (u.split("/").pop()) || u;
+						}
+					};
+					att = { file_url: imgval, file_name: deriveName(imgval) };
+				}
+
+				// Always use the new lightbox
+				frm.attachments.open_attachment_lightbox(att);
 			}
 		}
 	);

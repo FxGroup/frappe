@@ -243,7 +243,10 @@ def run(
 
 def add_custom_column_data(custom_columns, result):
 	doctype_names_from_custom_field = []
+	original_fieldnames = {}  # Store original fieldnames before modification
+
 	for column in custom_columns:
+		original_fieldnames[id(column)] = column["fieldname"]
 		if len(column["fieldname"].split("-")) > 1:
 			# length greater than 1, means that the column is a custom field with confilicting fieldname
 			doctype_name = frappe.unscrub(column["fieldname"].split("-")[1])
@@ -267,9 +270,14 @@ def add_custom_column_data(custom_columns, result):
 				# possible if the row is empty
 				if not row_reference:
 					continue
+
+				# Determine the final fieldname to use in the row
 				if key[0] in doctype_names_from_custom_field:
-					column["fieldname"] = column.get("id")
-				row[column.get("fieldname")] = custom_column_data.get(key).get(row_reference)
+					final_fieldname = column.get("id") or original_fieldnames.get(id(column))
+				else:
+					final_fieldname = column.get("fieldname")
+
+				row[final_fieldname] = custom_column_data.get(key).get(row_reference)
 
 	return result
 
