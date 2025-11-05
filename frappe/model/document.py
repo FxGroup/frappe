@@ -470,7 +470,7 @@ class Document(BaseDocument):
 
 	def update_child_table(self, fieldname: str, df: Optional["DocField"] = None):
 		"""sync child table for given fieldname"""
-		df: "DocField" = df or self.meta.get_field(fieldname)
+		df: DocField = df or self.meta.get_field(fieldname)
 		all_rows = self.get(df.fieldname)
 
 		# delete rows that do not match the ones in the document
@@ -721,9 +721,13 @@ class Document(BaseDocument):
 
 	def is_child_table_same(self, fieldname):
 		"""Validate child table is same as original table before saving"""
+
+		if self.is_new():
+			return False
+
+		same = True
 		value = self.get(fieldname)
 		original_value = self._doc_before_save.get(fieldname)
-		same = True
 
 		if len(original_value) != len(value):
 			same = False
