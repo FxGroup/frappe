@@ -52,7 +52,7 @@ class AutoEmailReport(Document):
 		filter_meta: DF.Text | None
 		filters: DF.Text | None
 		format: DF.Literal["HTML", "XLSX", "CSV"]
-		frequency: DF.Literal["Daily", "Weekdays", "Weekly", "Monthly"]
+		frequency: DF.Literal["Daily", "Weekdays", "Weekly", "Monthly", "Quarterly", "Yearly"]
 		from_date_field: DF.Literal[None]
 		no_of_rows: DF.Int
 		reference_report: DF.Data | None
@@ -338,10 +338,22 @@ def process_auto_email_report(report):
 
 
 def send_monthly():
-	"""Check reports to be sent monthly"""
+	"""Check reports to be sent monthly, quarterly, and yearly"""
+	current_month = now_datetime().month
+
+	# Send monthly reports
 	for report in frappe.get_all("Auto Email Report", {"enabled": 1, "frequency": "Monthly"}):
 		frappe.get_doc("Auto Email Report", report.name).send()
 
+	# Send quarterly reports (January, April, July, October)
+	if current_month in [1, 4, 7, 10]:
+		for report in frappe.get_all("Auto Email Report", {"enabled": 1, "frequency": "Quarterly"}):
+			frappe.get_doc("Auto Email Report", report.name).send()
+
+	# Send yearly reports (January only)
+	if current_month == 1:
+		for report in frappe.get_all("Auto Email Report", {"enabled": 1, "frequency": "Yearly"}):
+			frappe.get_doc("Auto Email Report", report.name).send()
 
 def make_links(columns, data):
 	for row in data:
