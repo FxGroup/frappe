@@ -350,6 +350,7 @@ def add_to_installed_apps(app_name, rebuild_website=True):
 			post_install(rebuild_website)
 
 	frappe.get_single("Installed Applications").update_versions()
+	frappe.db.commit()
 
 
 def remove_from_installed_apps(app_name):
@@ -360,6 +361,7 @@ def remove_from_installed_apps(app_name):
 			"DefaultValue", {"defkey": "installed_apps"}, "defvalue", json.dumps(installed_apps)
 		)
 		_clear_cache("__global")
+		frappe.local.doc_events_hooks = None
 		frappe.get_single("Installed Applications").update_versions()
 		frappe.db.commit()
 		if frappe.flags.in_install:
