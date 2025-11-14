@@ -64,6 +64,8 @@ frappe.ui.form.PrintView = class {
 	setup_toolbar() {
 		this.page.set_primary_action(__("Print"), () => this.printit(), "printer");
 
+		this.page.set_secondary_action(__("Remote Print"), () => this.remote_print(), "printer");
+
 		this.page.add_button(__("Full Page"), () => this.render_page("/printview?"), {
 			icon: "full-page",
 		});
@@ -502,7 +504,270 @@ frappe.ui.form.PrintView = class {
 		`
 		);
 	}
+	remote_print() {
+		let me = this;
 
+		// Check if PrintNode is enabled
+		frappe.call({
+			method: 'fxnmrnth.fxnmrnth.doctype.printnode_settings.printnode_settings.get_enabled_printers',
+			callback: function(r) {
+				if (!r.message || r.message.length === 0) {
+					frappe.msgprint({
+						title: __('PrintNode Not Configured'),
+						message: __('No printers are available. Please configure PrintNode Settings first.'),
+						indicator: 'red'
+					});
+					return;
+				}
+
+				// Show printer selection dialog
+				me.show_printnode_printer_dialog(r.message);
+			},
+			error: function() {
+				frappe.msgprint({
+					title: __('PrintNode Error'),
+					message: __('Failed to fetch printers. Please check PrintNode Settings.'),
+					indicator: 'red'
+				});
+			}
+		});
+	}
+
+	show_printnode_printer_dialog(printers) {
+		let me = this;
+
+		// Store the selected printer in localStorage for this doctype
+		const storage_key = `printnode_printer_${me.frm.doctype}`;
+		const last_printer = localStorage.getItem(storage_key);
+
+		const printer_options = printers.map(p => ({
+			label: p.display_name,
+			value: p.id,
+			description: p.description || ''
+		}));
+
+		const dialog = new frappe.ui.Dialog({
+			title: __('Select PrintNode Printer'),
+			fields: [
+				{
+					fieldtype: 'Select',
+					fieldname: 'printer_id',
+					label: __('Printer'),
+					options: printer_options.map(p => ({ label: p.label, value: p.value })),
+					reqd: 1,
+					default: last_printer || (printer_options.length > 0 ? printer_options[0].value : null)
+				},
+				{
+					fieldtype: 'Check',
+					fieldname: 'remember_printer',
+					label: __('Remember this printer for') + ' ' + me.frm.doctype,
+					default: 1
+				},
+				{
+					fieldtype: 'Check',
+					fieldname: 'wait_for_completion',
+					label: __('Wait for print job to complete'),
+					default: 0,
+					description: __('Monitor the print job until it finishes. Uncheck for fire-and-forget printing.')
+				},
+				{
+					fieldtype: 'Section Break'
+				},
+				{
+					fieldtype: 'HTML',
+					fieldname: 'status_area',
+					options: '<div class="print-status"></div>'
+				}
+			],
+			primary_action_label: __('Print'),
+			primary_action: function(values) {
+				// Save printer preference if requested
+				if (values.remember_printer) {
+					localStorage.setItem(storage_key, values.printer_id);
+				}
+
+				// Get the PDF URL
+				const pdf_url = me.get_pdf_url();
+				const printer_name = printer_options.find(p => p.value == values.printer_id)?.label || 'Printer';
+
+				// Show progress
+				dialog.set_df_property('printer_id', 'read_only', 1);
+				dialog.set_df_property('wait_for_completion', 'read_only', 1);
+				dialog.set_df_property('remember_printer', 'read_only', 1);
+				dialog.get_primary_btn().prop('disabled', true);
+
+				me.update_print_status(dialog, 'Submitting print job...', 'blue');
+
+				// Submit print job
+				const callback_info = me.get_after_print_callback();
+
+				frappe.call({
+					method: 'fxnmrnth.fxnmrnth.doctype.printnode_settings.printnode_settings.print_pdf',
+					args: {
+						printer_id: values.printer_id,
+						pdf_uri: pdf_url,
+						title: `${me.frm.doctype} - ${me.frm.docname}`,
+						source: `Frappe Print - ${me.frm.doctype}`,
+						wait_for_completion: values.wait_for_completion ? 1 : 0,
+						callback: callback_info.callback,
+						callback_args: JSON.stringify(callback_info.callback_args),
+						doctype: me.frm.doctype,
+						docname: me.frm.docname
+					},
+					callback: function(r) {
+						if (r.message && r.message.success) {
+							const job_id = r.message.job_id;
+
+							if (values.wait_for_completion) {
+								// Job was polled until completion
+								const poll_result = r.message.poll_result;
+								if (poll_result && poll_result.state === 'done') {
+									me.update_print_status(dialog, 'Print job completed successfully!', 'green');
+									frappe.show_alert({
+										message: __('Document printed successfully to {0}', [printer_name]),
+										indicator: 'green'
+									}, 5);
+
+									setTimeout(() => dialog.hide(), 2000);
+								} else if (poll_result && poll_result.state === 'error') {
+									me.update_print_status(dialog, 'Print job failed: ' + (poll_result.error || 'Unknown error'), 'red');
+									dialog.set_df_property('printer_id', 'read_only', 0);
+									dialog.set_df_property('wait_for_completion', 'read_only', 0);
+									dialog.set_df_property('remember_printer', 'read_only', 0);
+									dialog.get_primary_btn().prop('disabled', false);
+								} else {
+									me.update_print_status(dialog, 'Print job timed out or status unknown', 'orange');
+									dialog.set_df_property('printer_id', 'read_only', 0);
+									dialog.set_df_property('wait_for_completion', 'read_only', 0);
+									dialog.set_df_property('remember_printer', 'read_only', 0);
+									dialog.get_primary_btn().prop('disabled', false);
+								}
+							} else {
+								// Fire and forget
+								me.update_print_status(dialog, `Print job submitted (Job ID: ${job_id})`, 'green');
+								frappe.show_alert({
+									message: __('Print job submitted to {0}', [printer_name]),
+									indicator: 'green'
+								}, 5);
+
+								setTimeout(() => dialog.hide(), 2000);
+							}
+						} else {
+							me.update_print_status(dialog, 'Print job failed: ' + (r.message?.error || 'Unknown error'), 'red');
+							dialog.set_df_property('printer_id', 'read_only', 0);
+							dialog.set_df_property('wait_for_completion', 'read_only', 0);
+							dialog.set_df_property('remember_printer', 'read_only', 0);
+							dialog.get_primary_btn().prop('disabled', false);
+						}
+					},
+					error: function(r) {
+						me.update_print_status(dialog, 'Error: ' + (r.message || 'Failed to submit print job'), 'red');
+						dialog.set_df_property('printer_id', 'read_only', 0);
+						dialog.set_df_property('wait_for_completion', 'read_only', 0);
+						dialog.set_df_property('remember_printer', 'read_only', 0);
+						dialog.get_primary_btn().prop('disabled', false);
+					}
+				});
+			}
+		});
+
+		dialog.show();
+	}
+
+	update_print_status(dialog, message, indicator) {
+		const status_html = `
+			<style>
+				@keyframes pulse-dot {
+					0%, 100% { opacity: 1; transform: scale(1); }
+					50% { opacity: 0.3; transform: scale(1.2); }
+				}
+				.status-dot-pulse {
+					display: inline-block;
+					width: 8px;
+					height: 8px;
+					border-radius: 50%;
+					margin-right: 8px;
+					animation: pulse-dot 1.5s ease-in-out infinite;
+				}
+				.status-dot-pulse.blue {
+					background-color: #5e64ff;
+				}
+				.status-dot-pulse.green {
+					background-color: #98d85b;
+				}
+				.status-dot-pulse.red {
+					background-color: #ff5858;
+				}
+				.status-dot-pulse.orange {
+					background-color: #ffa00a;
+				}
+			</style>
+			<div class="alert alert-${indicator === 'green' ? 'success' : indicator === 'red' ? 'danger' : indicator === 'orange' ? 'warning' : 'info'}"
+				style="margin-top: 10px; display: flex; align-items: center;">
+				<span class="status-dot-pulse ${indicator}"></span>
+				<span>${__(message)}</span>
+			</div>
+		`;
+		dialog.fields_dict.status_area.$wrapper.html(status_html);
+	}
+
+	get_pdf_url() {
+		// Build the full PDF URL that PrintNode can access
+		let base_url = window.location.origin;
+		let print_format = this.selected_format();
+		let letterhead = this.get_letterhead();
+
+		let url = `${base_url}/api/method/frappe.utils.print_format.download_pdf?` +
+			`doctype=${encodeURIComponent(this.frm.doc.doctype)}&` +
+			`name=${encodeURIComponent(this.frm.doc.name)}&` +
+			`format=${encodeURIComponent(print_format)}&` +
+			`no_letterhead=${this.with_letterhead() ? '0' : '1'}`;
+
+		if (letterhead && letterhead !== __("No Letterhead")) {
+			url += `&letterhead=${encodeURIComponent(letterhead)}`;
+		}
+
+		if (this.additional_settings && Object.keys(this.additional_settings).length > 0) {
+			url += `&settings=${encodeURIComponent(JSON.stringify(this.additional_settings))}`;
+		}
+
+		if (this.lang_code) {
+			url += `&_lang=${this.lang_code}`;
+		}
+
+		return url;
+	}
+
+	get_after_print_callback() {
+		let me = this;
+
+		// Check if the doctype has a custom callback defined
+		// This can be overridden in custom scripts
+		if (me.frm && me.frm.printnode_after_print_callback) {
+			return {
+				callback: me.frm.printnode_after_print_callback,
+				callback_args: me.get_callback_args()
+			};
+		}
+
+		// No callback defined
+		return {
+			callback: null,
+			callback_args: {}
+		};
+	}
+
+	get_callback_args() {
+		let me = this;
+
+		return {
+			doctype: me.frm.doctype,
+			docname: me.frm.docname,
+			print_format: me.selected_format(),
+			letterhead: me.get_letterhead()
+		};
+	}
+	
 	printit() {
 		let me = this;
 
