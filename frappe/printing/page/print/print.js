@@ -610,7 +610,9 @@ frappe.ui.form.PrintView = class {
 						source: `Frappe Print - ${me.frm.doctype}`,
 						wait_for_completion: values.wait_for_completion ? 1 : 0,
 						callback: callback_info.callback,
-						callback_args: JSON.stringify(callback_info.callback_args)
+						callback_args: JSON.stringify(callback_info.callback_args),
+						doctype: me.frm.doctype,
+						docname: me.frm.docname
 					},
 					callback: function(r) {
 						if (r.message && r.message.success) {
