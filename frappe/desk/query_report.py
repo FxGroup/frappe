@@ -600,13 +600,32 @@ def get_data_for_custom_field(doctype, field, names=None):
 	if not frappe.has_permission(doctype, "read"):
 		frappe.throw(_("Not Permitted to read {0}").format(_(doctype)), frappe.PermissionError)
 
-	filters = {}
-	if names:
-		if isinstance(names, str | bytearray):
-			names = frappe.json.loads(names)
-		filters.update({"name": ["in", names]})
+	if not names:
+		return frappe._dict(frappe.get_list(doctype, fields=["name", field], as_list=1))
 
-	return frappe._dict(frappe.get_list(doctype, filters=filters, fields=["name", field], as_list=1))
+	if isinstance(names, str | bytearray):
+		names = frappe.json.loads(names)
+
+	names = list(set(filter(None, names)))
+
+	if not names:
+		return frappe._dict()
+
+	batch_size = 500
+	result = frappe._dict()
+
+	try:
+		for i in range(0, len(names), batch_size):
+			batch = names[i:i + batch_size]
+			filters = {"name": ["in", batch]}
+			batch_data = frappe.get_list(doctype, filters=filters, fields=["name", field], as_list=1)
+			if batch_data:
+				result.update(frappe._dict(batch_data))
+	except Exception as e:
+		frappe.log_error(f"Error fetching custom field data for {doctype}.{field}: {str(e)}")
+		frappe.throw(_("Error fetching custom field data: {0}").format(str(e)))
+
+	return result
 
 
 def get_data_for_custom_report(columns, result):
