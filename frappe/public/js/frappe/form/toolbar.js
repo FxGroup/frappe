@@ -345,6 +345,7 @@ frappe.ui.form.Toolbar = class Toolbar {
 			!is_submittable ||
 			docstatus == 1 ||
 			(allow_print_for_cancelled && docstatus == 2) ||
+			(frappe.user.has_role(["System Manager", "Administrator", "Shipping Manager", "System Support"]) && docstatus == 2) ||
 			(allow_print_for_draft && docstatus == 0)
 		) {
 			if (frappe.model.can_print(null, me.frm) && !this.frm.meta.issingle) {
