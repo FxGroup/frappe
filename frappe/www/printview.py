@@ -139,7 +139,11 @@ def get_rendered_template(
 		if doc.docstatus.is_draft() and not cint(print_settings.allow_print_for_draft):
 			frappe.throw(_("Not allowed to print draft documents"), frappe.PermissionError)
 
-		if doc.docstatus.is_cancelled() and not cint(print_settings.allow_print_for_cancelled):
+		allowed_roles = {"System Manager", "Administrator", "Shipping Manager", "System Support"}
+		user_roles = set(frappe.get_roles())
+		has_allowed_role = bool(allowed_roles & user_roles)
+
+		if doc.docstatus.is_cancelled() and not cint(print_settings.allow_print_for_cancelled) and not has_allowed_role:
 			frappe.throw(_("Not allowed to print cancelled documents"), frappe.PermissionError)
 
 	doc.run_method("before_print", print_settings)
