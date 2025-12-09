@@ -127,8 +127,7 @@ frappe.ui.form.ControlMultiSelectList = class ControlMultiSelectList extends (
 			
 				// this.set_selectable_items(this._options);
 			});
-			
-
+			this.adjust_dropdown_right_position();
 		});
 
 		this.set_input_attributes();
@@ -283,7 +282,6 @@ frappe.ui.form.ControlMultiSelectList = class ControlMultiSelectList extends (
 		this.$list_wrapper.find(".selectable-items").html(html);
 
 		this.highlighted = -1;
-		this.adjust_dropdown_right_position();
 	}
 
 	adjust_dropdown_right_position() {
