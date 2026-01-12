@@ -4,10 +4,10 @@ import time
 
 import frappe
 from frappe.auth import CookieManager, LoginManager
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 
 
-class TestActivityLog(FrappeTestCase):
+class TestActivityLog(IntegrationTestCase):
 	def setUp(self) -> None:
 		frappe.set_user("Administrator")
 
@@ -50,7 +50,7 @@ class TestActivityLog(FrappeTestCase):
 				"user": "Administrator",
 				"operation": operation,
 			},
-			order_by="`creation` DESC",
+			order_by="creation DESC",
 		)
 
 		name = names[0]

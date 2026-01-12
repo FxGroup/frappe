@@ -32,7 +32,7 @@ frappe.setup = {
 
 frappe.pages["setup-wizard"].on_page_load = function (wrapper) {
 	if (frappe.boot.setup_complete) {
-		window.location.href = frappe.boot.apps_data.default_path || "/app";
+		window.location.href = frappe.boot.apps_data.default_path || "/desk";
 	}
 	let requires = frappe.boot.setup_wizard_requires || [];
 	frappe.require(requires, function () {
@@ -219,7 +219,7 @@ frappe.setup.SetupWizard = class SetupWizard extends frappe.ui.Slides {
 			localStorage.current_route = "";
 			localStorage.current_app = "";
 
-			window.location.href = current_route || frappe.boot.apps_data.default_path || "/app";
+			window.location.href = current_route || frappe.boot.apps_data.default_path || "/desk";
 		}, 2000);
 	}
 
@@ -231,7 +231,7 @@ frappe.setup.SetupWizard = class SetupWizard extends frappe.ui.Slides {
 			? frappe.last_response.setup_wizard_failure_message
 			: __("Failed to complete setup");
 
-		this.update_setup_message(__("Could not start up: ") + fail_msg);
+		this.update_setup_message(__("Could not start up:") + " " + fail_msg);
 
 		this.$working_state.find(".title").html(__("Setup failed"));
 
@@ -409,7 +409,6 @@ frappe.setup.slides_settings = [
 				fieldtype: "Select",
 				reqd: 1,
 			},
-			{ fieldtype: "Column Break" },
 			{
 				fieldname: "currency",
 				label: __("Currency"),

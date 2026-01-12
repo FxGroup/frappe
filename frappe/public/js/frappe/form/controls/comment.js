@@ -9,7 +9,10 @@ frappe.ui.form.ControlComment = class ControlComment extends frappe.ui.form.Cont
 			? $(`
 			<div class="comment-input-wrapper">
 				<div class="comment-input-header">
-				<span>${__("Comments")}</span>
+					<div>
+						<span class="comment-title">${__("Comments")}</span>
+						<span class="comment-count"></span>
+					</div>
 				</div>
 				<div class="comment-input-container">
 				${frappe.avatar(frappe.session.user, "avatar-medium")}

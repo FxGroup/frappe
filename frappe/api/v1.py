@@ -76,8 +76,7 @@ def read_doc(doctype: str, name: str):
 		return execute_doc_method(doctype, name)
 
 	doc = frappe.get_doc(doctype, name)
-	if not doc.has_permission("read"):
-		raise frappe.PermissionError
+	doc.check_permission("read")
 	doc.apply_fieldlevel_read_permissions()
 	if sbool(frappe.form_dict.get("expand_links")):
 		doc_dict = doc.as_dict()
@@ -117,14 +116,11 @@ def execute_doc_method(doctype: str, name: str, method: str | None = None):
 	doc.is_whitelisted(method)
 
 	if frappe.request.method == "GET":
-		if not doc.has_permission("read"):
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
+		doc.check_permission("read")
 		return doc.run_method(method, **frappe.form_dict)
 
 	elif frappe.request.method == "POST":
-		if not doc.has_permission("write"):
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
-
+		doc.check_permission("write")
 		return doc.run_method(method, **frappe.form_dict)
 
 

@@ -31,6 +31,7 @@ class GoogleContacts(Document):
 		refresh_token: DF.Password | None
 
 	# end: auto-generated types
+
 	def validate(self):
 		if not frappe.db.get_single_value("Google Settings", "enable"):
 			frappe.throw(_("Enable Google API in Google Settings."))
@@ -64,7 +65,7 @@ def authorize_access(g_contact, reauthorize=False, code=None):
 		return oauth_obj.get_authentication_url(
 			{
 				"g_contact": g_contact,
-				"redirect": f"/app/Form/{quote('Google Contacts')}/{quote(g_contact)}",
+				"redirect": f"/desk/Form/{quote('Google Contacts')}/{quote(g_contact)}",
 			},
 		)
 
@@ -75,9 +76,7 @@ def authorize_access(g_contact, reauthorize=False, code=None):
 
 
 def get_google_contacts_object(g_contact):
-	"""
-	Returns an object of Google Calendar along with Google Calendar doc.
-	"""
+	"""Return an object of Google Calendar along with Google Calendar doc."""
 	account = frappe.get_doc("Google Contacts", g_contact)
 	oauth_obj = GoogleOAuth("contacts")
 

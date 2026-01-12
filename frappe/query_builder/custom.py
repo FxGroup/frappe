@@ -1,6 +1,6 @@
 from typing import Any
 
-from pypika.functions import DistinctOptionFunction
+from pypika.functions import DistinctOptionFunction, Function
 from pypika.terms import Term
 from pypika.utils import builder, format_alias_sql, format_quotes
 
@@ -88,11 +88,7 @@ class ConstantColumn(Term):
 	alias = None
 
 	def __init__(self, value: str) -> None:
-		"""[ Returns a pseudo column with a constant value in all the rows]
-
-		Args:
-		        value (str): [ Value of the column ]
-		"""
+		"""Return a pseudo column with the given constant `value` in all the rows."""
 		self.value = value
 
 	def get_sql(self, quote_char: str | None = None, **kwargs: Any) -> str:
@@ -102,3 +98,18 @@ class ConstantColumn(Term):
 			quote_char=quote_char,
 			**kwargs,
 		)
+
+
+class MonthName(Function):
+	def __init__(self, field, alias=None):
+		super().__init__("MONTHNAME", field, alias=alias)
+
+
+class Quarter(Function):
+	def __init__(self, field, alias=None):
+		super().__init__("QUARTER", field, alias=alias)
+
+
+class Month(Function):
+	def __init__(self, field, alias=None):
+		super().__init__("MONTH", field, alias=alias)

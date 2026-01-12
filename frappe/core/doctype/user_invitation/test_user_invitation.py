@@ -12,7 +12,7 @@ from frappe.core.api.user_invitation import (
 	invite_by_email,
 )
 from frappe.core.doctype.user_invitation.user_invitation import mark_expired_invitations
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 
 emails = [
 	"test_user_invite1@example.com",
@@ -24,9 +24,9 @@ emails = [
 ]
 
 
-class TestUserInvitation(FrappeTestCase):
+class IntegrationTestUserInvitation(IntegrationTestCase):
 	"""
-	Tests for UserInvitation.
+	Integration tests for UserInvitation.
 	"""
 
 	@classmethod
@@ -43,8 +43,8 @@ class TestUserInvitation(FrappeTestCase):
 	@classmethod
 	def tearDownClass(cls):
 		super().tearDownClass()
-		TestUserInvitation.delete_all_invitations()
-		TestUserInvitation.delete_all_user_roles()
+		IntegrationTestUserInvitation.delete_all_invitations()
+		IntegrationTestUserInvitation.delete_all_user_roles()
 		frappe.db.delete("Email Queue")
 		for user_email in emails:
 			if frappe.db.exists("User", user_email):
@@ -55,26 +55,30 @@ class TestUserInvitation(FrappeTestCase):
 
 	@classmethod
 	def delete_all_user_roles(cls):
-		frappe.db.sql("DELETE FROM `tabUser Role`")
+		query = "DELETE FROM `tabUser Role`"
+		frappe.db.sql(cls.normalize_sql(query))
 
 	@classmethod
 	def delete_all_invitations(cls):
-		frappe.db.sql("DELETE FROM `tabUser Invitation`")
+		query = "DELETE FROM `tabUser Invitation`"
+		frappe.db.sql(cls.normalize_sql(query))
 
 	@classmethod
 	def delete_invitation(cls, name: str):
-		frappe.db.sql(f'DELETE FROM `tabUser Invitation` WHERE name = "{name}"')
+		query = "DELETE FROM `tabUser Invitation` WHERE name = %s"
+		frappe.db.sql(cls.normalize_sql(query), name)
 
 	def setUp(self):
 		super().setUp()
-		TestUserInvitation.delete_all_invitations()
-		TestUserInvitation.delete_all_user_roles()
+		IntegrationTestUserInvitation.delete_all_invitations()
+		IntegrationTestUserInvitation.delete_all_user_roles()
 		frappe.db.delete("Email Queue")
 
 	def test_insert_invitation(self):
 		invitation = self.get_dummy_invitation()
 		self.assertEqual(len(self.get_email_names()), 0)
 		invitation.insert()
+		frappe.db.commit()
 		self.assertEqual(invitation.invited_by, frappe.session.user)
 		self.assertEqual(invitation.status, "Pending")
 		self.assertIsInstance(invitation.email_sent_at, str)
@@ -87,8 +91,10 @@ class TestUserInvitation(FrappeTestCase):
 	def test_update_invitation_status_to_expired(self):
 		invitation = self.get_dummy_invitation()
 		invitation.insert()
+		frappe.db.commit()
 		self.assertEqual(len(self.get_email_names()), 1)
 		invitation.expire()
+		frappe.db.commit()
 		emails = self.get_email_messages(False)
 		self.assertEqual(len(emails), 2)
 		self.assertIn("expired", emails[0].message.lower())
@@ -162,7 +168,7 @@ class TestUserInvitation(FrappeTestCase):
 		self.assertSequenceEqual(res["invited_emails"], [email_to_invite])
 		self.assertEqual(len(self.get_email_names(False)), 3)
 		user = frappe.get_doc("User", invitation.email)
-		TestUserInvitation.delete_invitation(invitation.name)
+		IntegrationTestUserInvitation.delete_invitation(invitation.name)
 		frappe.delete_doc("User", user.name)
 
 	def test_invite_by_email_api_disabled_user(self):
@@ -204,7 +210,7 @@ class TestUserInvitation(FrappeTestCase):
 		pattern = f"^{re.escape(frappe.utils.get_url(''))}/update-password\\?key=.+&redirect_to=/abc$"
 		self.assertRegex(res.location, pattern)
 		user = frappe.get_doc("User", invitation.email)
-		TestUserInvitation.delete_invitation(invitation.name)
+		IntegrationTestUserInvitation.delete_invitation(invitation.name)
 		frappe.delete_doc("User", user.name)
 
 	def test_accept_invitation_api_direct_redirect(self):
@@ -230,7 +236,7 @@ class TestUserInvitation(FrappeTestCase):
 		pattern = f"^{re.escape(frappe.utils.get_url(''))}/abc$"
 		self.assertRegex(res.location, pattern)
 		user = frappe.get_doc("User", invitation.email)
-		TestUserInvitation.delete_invitation(invitation.name)
+		IntegrationTestUserInvitation.delete_invitation(invitation.name)
 		frappe.delete_doc("User", user.name)
 
 	def test_get_pending_invitations_api(self):
@@ -249,15 +255,21 @@ class TestUserInvitation(FrappeTestCase):
 	def test_cancel_invitation_api(self):
 		invitation = self.get_dummy_invitation()
 		invitation.insert()
+		frappe.db.commit()
+
 		invitation.reload()
 		self.assertEqual(invitation.status, "Pending")
 		self.assertEqual(len(self.get_email_names()), 1)
 		res = cancel_invitation(invitation.name, "frappe")
+		frappe.db.commit()
+
 		self.assertTrue(res["cancelled_now"])
 		invitation.reload()
 		self.assertEqual(invitation.status, "Cancelled")
 		self.assertEqual(len(self.get_email_names()), 2)
 		res = cancel_invitation(invitation.name, "frappe")
+		frappe.db.commit()
+
 		self.assertFalse(res["cancelled_now"])
 		self.assertEqual(len(self.get_email_names()), 2)
 

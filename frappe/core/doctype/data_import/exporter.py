@@ -128,7 +128,6 @@ class Exporter:
 		for doc in data:
 			rows = []
 			rows = self.add_data_row(self.doctype, None, doc, rows, 0)
-
 			if table_fields:
 				# add child table data
 				for f in table_fields:
@@ -152,9 +151,10 @@ class Exporter:
 				value = doc.get(df.fieldname, None)
 
 				if df.fieldtype == "Duration":
-					value = flt(value or 0)
-					value = format_duration(value, df.hide_days)
+					value = format_duration(flt(value), df.hide_days)
 
+				if df.fieldtype == "Text Editor" and value:
+					value = frappe.core.utils.html2text(value)
 				row[i] = value
 		return rows
 
@@ -165,9 +165,9 @@ class Exporter:
 		filters = self.export_filters
 
 		if self.meta.is_nested_set():
-			order_by = f"`tab{self.doctype}`.`lft` ASC"
+			order_by = "lft ASC"
 		else:
-			order_by = f"`tab{self.doctype}`.`creation` DESC"
+			order_by = "creation DESC"
 
 		parent_fields = [format_column_name(df) for df in self.fields if df.parent == self.doctype]
 		parent_data = frappe.db.get_list(

@@ -5,6 +5,8 @@ import json
 
 import frappe
 from frappe import _
+from frappe.query_builder import functions
+from frappe.query_builder.terms import ValueWrapper
 
 
 @frappe.whitelist()
@@ -19,7 +21,7 @@ def update_event(args, field_map):
 
 
 def get_event_conditions(doctype, filters=None):
-	"""Returns SQL conditions with user permissions and filters for event queries"""
+	"""Return SQL conditions with user permissions and filters for event queries."""
 	from frappe.desk.reportview import get_filters_cond
 
 	if not frappe.has_permission(doctype):
@@ -46,12 +48,14 @@ def get_events(doctype, start, end, field_map, filters=None, fields=None):
 	if field_map.color:
 		fields.append(field_map.color)
 
-	start_date = "ifnull({}, '0001-01-01 00:00:00')".format(field_map.start)
-	end_date = "ifnull({}, '2199-12-31 00:00:00')".format(field_map.end)
+	dt = frappe.qb.DocType(doctype)
+	start_field = functions.IfNull(dt[field_map.start], ValueWrapper("0001-01-01 00:00:00"))
+	end_field = functions.IfNull(dt[field_map.end], ValueWrapper("2199-12-31 00:00:00"))
 
 	filters += [
-		[doctype, start_date, "<=", end],
-		[doctype, end_date, ">=", start],
+		[start_field, "<=", end],
+		[end_field, ">=", start],
 	]
+
 	fields = list({field for field in fields if field})
 	return frappe.get_list(doctype, fields=fields, filters=filters)

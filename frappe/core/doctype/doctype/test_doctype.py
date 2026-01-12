@@ -4,6 +4,7 @@ import os
 import random
 import string
 import unittest
+from unittest.case import skipIf
 from unittest.mock import patch
 
 import frappe
@@ -24,11 +25,11 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.desk.form.load import getdoc
 from frappe.model.delete_doc import delete_controllers
 from frappe.model.sync import remove_orphan_doctypes
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 from frappe.utils import get_table_name
 
 
-class TestDocType(FrappeTestCase):
+class TestDocType(IntegrationTestCase):
 	def tearDown(self):
 		frappe.db.rollback()
 
@@ -47,6 +48,10 @@ class TestDocType(FrappeTestCase):
 			doc = new_doctype(name).insert()
 			doc.delete()
 
+	@skipIf(
+		frappe.conf.db_type == "sqlite",
+		"Not for SQLite for now",
+	)
 	def test_making_sequence_on_change(self):
 		frappe.delete_doc_if_exists("DocType", self._testMethodName)
 		dt = new_doctype(self._testMethodName).insert(ignore_permissions=True)
@@ -148,24 +153,25 @@ class TestDocType(FrappeTestCase):
 	def test_all_depends_on_fields_conditions(self):
 		import re
 
-		docfields = frappe.get_all(
-			"DocField",
-			or_filters={
-				"ifnull(depends_on, '')": ("!=", ""),
-				"ifnull(collapsible_depends_on, '')": ("!=", ""),
-				"ifnull(mandatory_depends_on, '')": ("!=", ""),
-				"ifnull(read_only_depends_on, '')": ("!=", ""),
-			},
-			fields=[
-				"parent",
-				"depends_on",
-				"collapsible_depends_on",
-				"mandatory_depends_on",
-				"read_only_depends_on",
-				"fieldname",
-				"fieldtype",
-			],
+		DocField = frappe.qb.DocType("DocField")
+		docfields_query = (
+			frappe.qb.from_(DocField)
+			.select(
+				DocField.parent,
+				DocField.depends_on,
+				DocField.collapsible_depends_on,
+				DocField.mandatory_depends_on,
+				DocField.read_only_depends_on,
+				DocField.fieldname,
+			)
+			.where(
+				(DocField.depends_on != "")
+				| (DocField.collapsible_depends_on != "")
+				| (DocField.mandatory_depends_on != "")
+				| (DocField.read_only_depends_on != "")
+			)
 		)
+		docfields = docfields_query.run(as_dict=True)
 
 		pattern = r'[\w\.:_]+\s*={1}\s*[\w\.@\'"]+'
 		for field in docfields:
@@ -788,6 +794,16 @@ class TestDocType(FrappeTestCase):
 		)
 		self.assertRaises(frappe.ValidationError, recursive_dt.insert)
 
+	def test_meta_serialization(self):
+		doctype = new_doctype(
+			fields=[{"fieldname": "some_fieldname", "fieldtype": "Data", "set_only_once": 1}],
+			is_submittable=1,
+		).insert()
+		doc = frappe.new_doc(doctype.name, some_fieldname="something").insert()
+		doc.save()
+		doc.submit()
+		frappe.get_meta(doctype.name).as_dict()
+
 	def test_row_compression(self):
 		if frappe.db.db_type != "mariadb":
 			return
@@ -825,7 +841,20 @@ class TestDocType(FrappeTestCase):
 			],
 		).insert(ignore_if_duplicate=True)
 		decimal_field_type = frappe.db.get_column_type(doctype.name, "decimal_field")
-		self.assertIn("(30,3)", decimal_field_type.lower())
+		if frappe.db.db_type == "postgres":
+			result = frappe.db.sql(
+				"""
+				SELECT numeric_precision, numeric_scale
+				FROM information_schema.columns
+				WHERE lower(table_name) = lower(%s)
+				AND column_name = %s
+				""",
+				(f"tab{doctype.name}", "decimal_field"),
+			)
+			length, precision = result[0]
+			self.assertEqual((length, precision), (30, 3))
+		elif frappe.db.db_type == "mariadb":
+			self.assertIn("(30,3)", decimal_field_type.lower())
 
 	def test_decimal_field_precision_exceeds_length(self):
 		doctype = new_doctype(
@@ -840,6 +869,16 @@ class TestDocType(FrappeTestCase):
 			],
 		)
 		self.assertRaises(frappe.ValidationError, doctype.insert)
+
+	def test_delete_doc_clears_cache(self):
+		dt = new_doctype(
+			fields=[{"fieldname": "test_fdname", "fieldtype": "Data", "label": "Test Field"}],
+		).insert()
+		frappe.get_meta(dt.name)
+		frappe.delete_doc("DocType", dt.name, force=1, delete_permanently=False)
+		frappe.db.commit()
+		with self.assertRaises(frappe.DoesNotExistError):
+			frappe.get_meta(dt.name)
 
 
 def new_doctype(

@@ -5,10 +5,11 @@ import json
 
 import frappe
 from frappe import _
+from frappe.custom.doctype.property_setter.property_setter import delete_property_setter
 from frappe.model import core_doctypes_list
 from frappe.model.docfield import supports_translation
 from frappe.model.document import Document
-from frappe.query_builder.functions import IfNull
+from frappe.query_builder import Field, functions
 from frappe.utils import cstr, random_string
 
 
@@ -24,6 +25,7 @@ class CustomField(Document):
 		allow_in_quick_entry: DF.Check
 		allow_on_submit: DF.Check
 		bold: DF.Check
+		button_color: DF.Literal["", "Default", "Primary", "Info", "Success", "Warning", "Danger"]
 		collapsible: DF.Check
 		collapsible_depends_on: DF.Code | None
 		columns: DF.Int
@@ -118,6 +120,7 @@ class CustomField(Document):
 		width: DF.Data | None
 
 	# end: auto-generated types
+
 	def autoname(self):
 		self.set_fieldname()
 		self.name = self.dt + "-" + self.fieldname
@@ -222,7 +225,7 @@ class CustomField(Document):
 			)
 
 		# delete property setter entries
-		frappe.db.delete("Property Setter", {"doc_type": self.dt, "field_name": self.fieldname})
+		delete_property_setter(self.dt, field_name=self.fieldname)
 
 		# update doctype layouts
 		doctype_layouts = frappe.get_all("DocType Layout", filters={"document_type": self.dt}, pluck="name")
@@ -249,6 +252,21 @@ class CustomField(Document):
 		if self.fieldname == self.insert_after:
 			frappe.throw(_("Insert After cannot be set as {0}").format(meta.get_label(self.insert_after)))
 
+	def get_permission_log_options(self, event=None):
+		if event != "after_delete" and self.fieldtype not in (
+			"Section Break",
+			"Column Break",
+			"Tab Break",
+			"Fold",
+		):
+			return {
+				"fields": ("ignore_user_permissions", "permlevel"),
+				"for_doctype": "DocType",
+				"for_document": self.dt,
+			}
+
+		self._no_perm_log = True
+
 
 @frappe.whitelist()
 def get_fields_label(doctype=None):
@@ -269,7 +287,7 @@ def get_fields_label(doctype=None):
 def create_custom_field_if_values_exist(doctype, df):
 	df = frappe._dict(df)
 	if df.fieldname in frappe.db.get_table_columns(doctype) and frappe.db.count(
-		dt=doctype, filters=IfNull(df.fieldname, "") != ""
+		dt=doctype, filters=functions.IfNull(Field(df.fieldname), "") != ""
 	):
 		create_custom_field(doctype, df)
 

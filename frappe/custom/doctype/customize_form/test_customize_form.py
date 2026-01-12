@@ -6,13 +6,13 @@ import json
 import frappe
 from frappe.core.doctype.doctype.doctype import InvalidFieldNameError
 from frappe.core.doctype.doctype.test_doctype import new_doctype
-from frappe.test_runner import make_test_records_for_doctype
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
+from frappe.tests.utils import make_test_records_for_doctype
 
-test_dependencies = ["Custom Field", "Property Setter"]
+EXTRA_TEST_RECORD_DEPENDENCIES = ["Custom Field", "Property Setter"]
 
 
-class TestCustomizeForm(FrappeTestCase):
+class TestCustomizeForm(IntegrationTestCase):
 	def insert_custom_field(self):
 		frappe.delete_doc_if_exists("Custom Field", "Event-custom_test_field")
 		self.field = frappe.get_doc(
@@ -175,7 +175,6 @@ class TestCustomizeForm(FrappeTestCase):
 
 		self.assertEqual(frappe.db.get_value("Custom Field", custom_field.name), None)
 
-		frappe.local.test_objects["Custom Field"] = []
 		make_test_records_for_doctype("Custom Field")
 
 	def test_reset_to_defaults(self):
@@ -185,7 +184,6 @@ class TestCustomizeForm(FrappeTestCase):
 
 		self.assertEqual(d.get("fields", {"fieldname": "repeat_this_event"})[0].in_list_view, 0)
 
-		frappe.local.test_objects["Property Setter"] = []
 		make_test_records_for_doctype("Property Setter")
 
 	def test_set_allow_on_submit(self):
@@ -337,7 +335,7 @@ class TestCustomizeForm(FrappeTestCase):
 		self.assertFalse([d.name for d in (user_group.links or []) if d.link_doctype == "User Group Member"])
 
 	def test_custom_action(self):
-		test_route = "/app/List/DocType"
+		test_route = "/desk/List/DocType"
 
 		# create a dummy action (route)
 		d = self.get_customize_form("Event")

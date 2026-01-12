@@ -202,7 +202,7 @@ frappe.form.formatters = {
 		} else if (docfield && doctype) {
 			if (frappe.model.can_read(doctype)) {
 				const a = document.createElement("a");
-				a.href = `/app/${encodeURIComponent(
+				a.href = `/desk/${encodeURIComponent(
 					frappe.router.slug(doctype)
 				)}/${encodeURIComponent(original_value)}`;
 				a.dataset.doctype = doctype;
@@ -397,7 +397,7 @@ frappe.form.formatters = {
 	},
 	Icon: (value) => {
 		return value
-			? `<div>
+			? `<div class='flex' style='gap: 8px;'>
 			<div class="selected-icon">${frappe.utils.icon(value, "md")}</div>
 			<span class="icon-value">${value}</span>
 		</div>`
@@ -417,7 +417,13 @@ frappe.form.get_formatter = function (fieldtype) {
 };
 
 frappe.format = function (value, df, options, doc) {
-	if (!df) df = { fieldtype: "Data" };
+	let mask_readonly = false;
+	if (df.parent) {
+		const mask_fields = frappe.get_meta(df.parent)?.masked_fields;
+		mask_readonly = mask_fields?.includes(df.fieldname);
+	}
+
+	if (!df || mask_readonly) df = { fieldtype: "Data" };
 	if (df.fieldname == "_user_tags") df = { ...df, fieldtype: "Tag" };
 	var fieldtype = df.fieldtype || "Data";
 
@@ -427,7 +433,9 @@ frappe.format = function (value, df, options, doc) {
 		df._options = doc ? doc[df.options] : null;
 	}
 
-	var formatter = df.formatter || frappe.form.get_formatter(fieldtype);
+	var formatter =
+		frappe.meta.get_docfield(doc?.doctype, df.fieldname)?.formatter ||
+		frappe.form.get_formatter(fieldtype);
 
 	var formatted = formatter(value, df, options, doc);
 

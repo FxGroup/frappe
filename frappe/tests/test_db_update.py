@@ -1,14 +1,17 @@
+import random
+from unittest.case import skipIf
+
 import frappe
 from frappe.core.doctype.doctype.test_doctype import new_doctype
 from frappe.core.utils import find
 from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 from frappe.query_builder.utils import db_type_is
+from frappe.tests import IntegrationTestCase
 from frappe.tests.test_query_builder import run_only_if
-from frappe.tests.utils import FrappeTestCase
 from frappe.utils import cstr
 
 
-class TestDBUpdate(FrappeTestCase):
+class TestDBUpdate(IntegrationTestCase):
 	def test_db_update(self):
 		doctype = "User"
 		frappe.reload_doctype("User", force=True)
@@ -35,7 +38,7 @@ class TestDBUpdate(FrappeTestCase):
 			)
 			default = field_def.default if field_def.default is not None else fallback_default
 
-			self.assertEqual(fieldtype, table_column.type)
+			self.assertIn(fieldtype, table_column.type, msg=f"Types not matching for {fieldname}")
 			self.assertIn(cstr(table_column.default) or "NULL", [cstr(default), f"'{default}'"])
 
 	def test_index_and_unique_constraints(self):
@@ -91,15 +94,33 @@ class TestDBUpdate(FrappeTestCase):
 		self.assertEqual(email_sig_column.index, 1)
 
 	def check_unique_indexes(self, doctype: str, field: str):
-		indexes = frappe.db.sql(
-			f"""show index from `tab{doctype}` where column_name = '{field}' and Non_unique = 0""",
-			as_dict=1,
-		)
+		if frappe.db.db_type == "postgres":
+			"""Check if the column has a unique index (PostgreSQL equivalent of "SHOW INDEX ... WHERE Non_unique = 0")"""
+			indexes = frappe.db.sql(
+				"""
+				SELECT i.relname AS index_name, a.attname AS column_name
+				FROM
+					pg_class t
+					JOIN pg_index ix ON t.oid = ix.indrelid
+					JOIN pg_class i ON i.oid = ix.indexrelid
+					JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+				WHERE
+					t.relname = %s
+					AND a.attname = %s
+					AND ix.indisunique = true
+				""",
+				(f"tab{doctype}", field),
+				as_dict=1,
+			)
+		elif frappe.db.db_type == "mariadb":
+			indexes = frappe.db.sql(
+				f"""show index from `tab{doctype}` where column_name = '{field}' and Non_unique = 0""",
+				as_dict=1,
+			)
 		self.assertEqual(
 			len(indexes), 1, msg=f"There should be 1 index on {doctype}.{field}, found {indexes}"
 		)
 
-	@run_only_if(db_type_is.MARIADB)  # postgres uses invalid type for <=15
 	def test_bigint_conversion(self):
 		doctype = new_doctype(fields=[{"fieldname": "int_field", "fieldtype": "Int"}]).insert()
 
@@ -110,7 +131,6 @@ class TestDBUpdate(FrappeTestCase):
 		doctype.save()
 		frappe.get_doc(doctype=doctype.name, int_field=2**62 - 1).insert()
 
-	@run_only_if(db_type_is.MARIADB)
 	def test_unique_index_on_install(self):
 		"""Only one unique index should be added"""
 		for dt in frappe.get_all("DocType", {"is_virtual": 0, "issingle": 0}, pluck="name"):
@@ -120,35 +140,93 @@ class TestDBUpdate(FrappeTestCase):
 				with self.subTest(f"Checking index {doctype.name} - {field.fieldname}"):
 					self.check_unique_indexes(doctype.name, field.fieldname)
 
-	@run_only_if(db_type_is.MARIADB)
 	def test_unique_index_on_alter(self):
 		"""Only one unique index should be added"""
 
 		doctype = new_doctype(unique=1).insert()
-		field = "some_fieldname"
+		try:
+			field = "some_fieldname"
 
-		self.check_unique_indexes(doctype.name, field)
-		doctype.fields[0].length = 142
+			self.check_unique_indexes(doctype.name, field)
+			doctype.fields[0].length = 142
+			doctype.save()
+			self.check_unique_indexes(doctype.name, field)
+
+			doctype.fields[0].unique = 0
+			doctype.save()
+
+			doctype.fields[0].unique = 1
+			doctype.save()
+			self.check_unique_indexes(doctype.name, field)
+
+			# New column with a unique index
+			# This works because index name is same as fieldname.
+			new_field = frappe.copy_doc(doctype.fields[0])
+			new_field.fieldname = "duplicate_field"
+			doctype.append("fields", new_field)
+			doctype.save()
+			self.check_unique_indexes(doctype.name, new_field.fieldname)
+		finally:
+			doctype.delete()
+			frappe.db.commit()
+
+	def test_uuid_varchar_migration(self):
+		doctype = new_doctype().insert()
+		doctype.autoname = "UUID"
 		doctype.save()
-		self.check_unique_indexes(doctype.name, field)
+		self.assertEqual(frappe.db.get_column_type(doctype.name, "name"), "uuid")
 
-		doctype.fields[0].unique = 0
+		doc = frappe.new_doc(doctype.name).insert()
+
+		doctype.autoname = "hash"
 		doctype.save()
+		varchar = "varchar" if frappe.db.db_type == "mariadb" else "character varying"
+		self.assertIn(varchar, frappe.db.get_column_type(doctype.name, "name"))
+		doc.reload()  # ensure that docs are still accesible
 
-		doctype.fields[0].unique = 1
-		doctype.save()
-		self.check_unique_indexes(doctype.name, field)
+	def test_uuid_link_field(self):
+		uuid_doctype = new_doctype().update({"autoname": "UUID"}).insert()
+		self.assertEqual(frappe.db.get_column_type(uuid_doctype.name, "name"), "uuid")
 
-		# New column with a unique index
-		# This works because index name is same as fieldname.
-		new_field = frappe.copy_doc(doctype.fields[0])
-		new_field.fieldname = "duplicate_field"
-		doctype.append("fields", new_field)
-		doctype.save()
-		self.check_unique_indexes(doctype.name, new_field.fieldname)
+		link = "link_field"
+		referring_doctype = new_doctype(
+			fields=[{"fieldname": link, "fieldtype": "Link", "options": uuid_doctype.name}]
+		).insert()
 
-		doctype.delete()
-		frappe.db.commit()
+		self.assertEqual(frappe.db.get_column_type(referring_doctype.name, link), "uuid")
+
+	def test_varchar_length(self):
+		from frappe.database.schema import add_column
+
+		test_doc = new_doctype().insert()
+		col_name = f"col_{frappe.generate_hash(length=4)}"
+		add_column(test_doc.name, fieldtype="Data", column_name=col_name, length=50)
+		length = frappe.db.sql(
+			f"SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tab{test_doc.name}' AND COLUMN_NAME = '{col_name}' ",
+		)[0][0]
+		self.assertEqual(length, 64)
+
+
+class TestDBUpdateSanityChecks(IntegrationTestCase):
+	@skipIf(
+		(frappe.conf.db_type == "sqlite"),
+		"Not for SQLite for now",
+	)
+	def test_no_unnecessary_migrates(self):
+		doctypes = frappe.get_all("DocType", {"is_virtual": 0, "custom": 0}, pluck="name")
+
+		# Migrating all doctypes takes way too long of a time.
+		# NOTE: This test mostly won't be flaky, if it fails randomly, it is because it tests
+		# randomly.
+		# DO NOT IGNORE FAILURES.
+		random.shuffle(doctypes)
+		doctypes = doctypes[:20]
+
+		for doctype in doctypes:
+			with self.subTest(f"Check {doctype}"):
+				frappe.reload_doctype(doctype, force=True)
+				with self.assertQueryCount(0, query_type=("alter",)):
+					frappe.reload_doctype(doctype, force=True)
 
 	@run_only_if(db_type_is.MARIADB)
 	def test_varchar_length(self):
@@ -166,7 +244,7 @@ class TestDBUpdate(FrappeTestCase):
 def get_fieldtype_from_def(field_def):
 	fieldtuple = frappe.db.type_map.get(field_def.fieldtype, ("", 0))
 	fieldtype = fieldtuple[0]
-	if fieldtype in ("varchar", "datetime", "int"):
+	if fieldtype in ("varchar", "datetime"):
 		fieldtype += f"({field_def.length or fieldtuple[1]})"
 	return fieldtype
 

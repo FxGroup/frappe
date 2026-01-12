@@ -37,6 +37,11 @@ class PermissionInspector(Document):
 		user: DF.Link
 	# end: auto-generated types
 
+	def onload(self):
+		from frappe.core.doctype.permission_type.permission_type import get_doctype_ptype_map
+
+		self.set_onload("doctype_ptype_map", get_doctype_ptype_map())
+
 	@frappe.whitelist()
 	def debug(self):
 		if not (self.ref_doctype and self.user):
@@ -58,12 +63,12 @@ class PermissionInspector(Document):
 	def db_update(self): ...
 
 	@staticmethod
-	def get_list(args): ...
+	def get_list(): ...
 
 	@staticmethod
-	def get_count(args): ...
+	def get_count(): ...
 
 	@staticmethod
-	def get_stats(args): ...
+	def get_stats(): ...
 
 	def delete(self): ...

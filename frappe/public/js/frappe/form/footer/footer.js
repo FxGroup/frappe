@@ -39,15 +39,9 @@ frappe.ui.form.Footer = class FormFooter {
 							comment_email: frappe.session.user,
 							comment_by: frappe.session.user_fullname,
 						})
-						.then((comment) => {
-							let comment_item =
-								this.frm.timeline.get_comment_timeline_item(comment);
+						.then(() => {
 							this.frm.comment_box.set_value("");
 							frappe.utils.play_sound("click");
-							this.frm.timeline.add_timeline_item(comment_item);
-							this.frm.get_docinfo().comments.push(comment);
-							this.frm.sidebar.refresh_comments_count &&
-								this.frm.sidebar.refresh_comments_count();
 						})
 						.finally(() => {
 							this.frm.comment_box.enable();
@@ -69,5 +63,11 @@ frappe.ui.form.Footer = class FormFooter {
 			this.parent.removeClass("hide");
 			this.frm.timeline.refresh();
 		}
+		this.refresh_comments_count();
+	}
+
+	refresh_comments_count() {
+		let count = (this.frm.get_docinfo().comments || []).length;
+		this.wrapper.find(".comment-count")?.html(count ? `(${count})` : "");
 	}
 };

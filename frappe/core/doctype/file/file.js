@@ -37,6 +37,10 @@ frappe.ui.form.on("File", {
 		if (frm.doc.file_name && frm.doc.file_name.split(".").splice(-1)[0] === "zip") {
 			frm.add_custom_button(__("Unzip"), () => frm.trigger("unzip"));
 		}
+
+		if (!frappe.utils.can_upload_public_files() && frm.doc.is_private) {
+			frm.set_df_property("is_private", "read_only", 1);
+		}
 	},
 
 	preview_file: function (frm) {
@@ -47,6 +51,7 @@ frappe.ui.form.on("File", {
 			$preview = $(`<div class="img_preview">
 				<img
 					class="img-responsive"
+					style="max-width: 500px";
 					src="${frappe.utils.escape_html(frm.doc.file_url)}"
 					onerror="${frm.toggle_display("preview", false)}"
 				/>
@@ -89,7 +94,16 @@ frappe.ui.form.on("File", {
 		if (frm.doc.file_name) {
 			file_url = file_url.replace(/#/g, "%23");
 		}
-		window.open(file_url);
+
+		// create temporary link element to simulate a download click
+		var link = document.createElement("a");
+		link.href = file_url;
+		link.download = frm.doc.file_name;
+		link.style.display = "none";
+
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
 	},
 
 	optimize: function (frm) {

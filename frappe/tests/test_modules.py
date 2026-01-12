@@ -12,7 +12,7 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 from frappe.model.meta import trim_table
 from frappe.modules import export_customizations, export_module_json, get_module_path
 from frappe.modules.utils import export_doc, sync_customizations
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 from frappe.utils import now_datetime
 
 
@@ -31,7 +31,7 @@ def delete_path(path):
 		shutil.rmtree(path, ignore_errors=True)
 
 
-class TestUtils(FrappeTestCase):
+class TestUtils(IntegrationTestCase):
 	def setUp(self):
 		self._dev_mode = frappe.local.conf.developer_mode
 		frappe.local.conf.developer_mode = True
@@ -83,6 +83,53 @@ class TestUtils(FrappeTestCase):
 			self.addCleanup(delete_file, path=file_path)
 			self.assertTrue(file_path.endswith("/custom/custom/note.json"))
 			self.assertTrue(os.path.exists(file_path))
+
+	@unittest.skipUnless(
+		os.access(frappe.get_app_path("frappe"), os.W_OK), "Only run if frappe app paths is writable"
+	)
+	def test_export_customizations_with_module_filter(self):
+		# create two customizations, one matching the module, one under a different module
+		with note_customizations() as (custom_field, property_setter, _doctype_link):
+			custom_field.db_set("module", "Custom")
+			property_setter.db_set("module", "Custom")
+
+			# create module def called OtherModule
+			other_module = frappe.new_doc("Module Def")
+
+			other_module.update({"module_name": "OtherModule", "app_name": "frappe"})
+			other_module.save(ignore_permissions=True)
+			self.addCleanup(other_module.delete)
+
+			# create a customization belonging to another module (should be excluded)
+			other_cf = create_custom_field(
+				"Note",
+				df={
+					"fieldname": "other_mod_field",
+					"label": "Other Mod Field",
+					"fieldtype": "Data",
+					"module": "OtherModule",
+				},
+			)
+
+			self.addCleanup(other_cf.delete)
+
+			file_path = export_customizations(
+				module="Custom",
+				doctype="Note",
+				apply_module_export_filter=True,
+			)
+			self.addCleanup(delete_file, path=file_path)
+
+			self.assertTrue(os.path.exists(file_path))
+
+			with open(file_path) as f:
+				exported = frappe.parse_json(f.read())
+
+			exported_fields = {f["fieldname"] for f in exported.get("custom_fields", [])}
+
+			self.assertIn("test_export_customizations_field", exported_fields)
+
+			self.assertNotIn("other_mod_field", exported_fields)
 
 	@unittest.skipUnless(
 		os.access(frappe.get_app_path("frappe"), os.W_OK), "Only run if frappe app paths is writable"

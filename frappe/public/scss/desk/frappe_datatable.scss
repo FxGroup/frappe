@@ -17,7 +17,7 @@
 	--dt-selection-highlight-color: var(--highlight-color);
 
 	background-color: var(--bg-color);
-	margin-left: -5px;
+	margin-left: -1px;
 	margin-top: 0px;
 	@include get_textstyle("base", "regular");
 
@@ -134,8 +134,7 @@
 	}
 
 	.dt-scrollable {
-		max-height: calc(100vh - 250px);
-		min-height: 100px;
+		height: calc(100vh - 240px);
 		scrollbar-width: thin;
 		border-top: 0 !important;
 	}

@@ -3,9 +3,9 @@
 
 import frappe
 from frappe.desk.form.load import getdoc
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests import IntegrationTestCase
 
 
-class TestSystemHealthReport(FrappeTestCase):
+class TestSystemHealthReport(IntegrationTestCase):
 	def test_it_works(self):
 		getdoc("System Health Report", "System Health Report")

@@ -6,6 +6,7 @@ Utilities for using modules
 
 import json
 import os
+import shutil
 from pathlib import Path
 from textwrap import dedent, indent
 from typing import TYPE_CHECKING, Union
@@ -25,10 +26,9 @@ doctype_python_modules = {}
 
 
 def export_module_json(doc: "Document", is_standard: bool, module: str) -> str | None:
-	"""Make a folder for the given doc and add its json file (make it a standard
-	object that will be synced)
+	"""Make a folder for the given doc and add its json file (make it a standard object that will be synced).
 
-	Returns the absolute file_path without the extension.
+	Return the absolute file_path without the extension.
 	Eg: For exporting a Print Format "_Test Print Format 1", the return value will be
 	`/home/gavin/frappe-bench/apps/frappe/frappe/core/print_format/_test_print_format_1/_test_print_format_1`
 	"""
@@ -56,21 +56,41 @@ def get_doc_module(module: str, doctype: str, name: str) -> "ModuleType":
 
 @frappe.whitelist()
 def export_customizations(
-	module: str, doctype: str, sync_on_migrate: bool = False, with_permissions: bool = False
+	module: str,
+	doctype: str,
+	sync_on_migrate: bool = False,
+	with_permissions: bool = False,
+	apply_module_export_filter: bool = False,
 ):
 	"""Export Custom Field and Property Setter for the current document to the app folder.
 	This will be synced with bench migrate"""
 
 	sync_on_migrate = cint(sync_on_migrate)
 	with_permissions = cint(with_permissions)
+	apply_module_export_filter = cint(apply_module_export_filter)
+
+	cf_filters = {"dt": doctype}
+	ps_filters = {"doc_type": doctype}
+
+	if apply_module_export_filter:
+		cf_filters["module"] = module
+		ps_filters["module"] = module
 
 	if not frappe.conf.developer_mode:
 		frappe.throw(_("Only allowed to export customizations in developer mode"))
 
 	custom = {
-		"custom_fields": frappe.get_all("Custom Field", fields="*", filters={"dt": doctype}, order_by="name"),
+		"custom_fields": frappe.get_all(
+			"Custom Field",
+			fields="*",
+			filters=cf_filters,
+			order_by="name",
+		),
 		"property_setters": frappe.get_all(
-			"Property Setter", fields="*", filters={"doc_type": doctype}, order_by="name"
+			"Property Setter",
+			fields="*",
+			filters=ps_filters,
+			order_by="name",
 		),
 		"custom_perms": [],
 		"links": frappe.get_all("DocType Link", fields="*", filters={"parent": doctype}, order_by="name"),
@@ -85,7 +105,9 @@ def export_customizations(
 
 	# also update the custom fields and property setters for all child tables
 	for d in frappe.get_meta(doctype).get_table_fields():
-		export_customizations(module, d.options, sync_on_migrate, with_permissions)
+		export_customizations(
+			module, d.options, sync_on_migrate, with_permissions, apply_module_export_filter
+		)
 
 	if custom["custom_fields"] or custom["property_setters"] or custom["custom_perms"]:
 		folder_path = os.path.join(get_module_path(module), "custom")
@@ -218,7 +240,7 @@ def sync_customizations_for_doctype(data: dict, folder: str, filename: str = "")
 
 
 def scrub_dt_dn(dt: str, dn: str) -> tuple[str, str]:
-	"""Returns in lowercase and code friendly names of doctype and name for certain types"""
+	"""Return in lowercase and code friendly names of doctype and name for certain types."""
 	return scrub(dt), scrub(dn)
 
 
@@ -254,7 +276,7 @@ def export_doc(doctype, name, module=None):
 
 
 def get_doctype_module(doctype: str) -> str:
-	"""Returns **Module Def** name of given doctype."""
+	"""Return **Module Def** name of given doctype."""
 	doctype_module_map = frappe.cache.get_value(
 		"doctype_modules",
 		generator=lambda: dict(frappe.qb.from_("DocType").select("name", "module").run()),
@@ -267,7 +289,7 @@ def get_doctype_module(doctype: str) -> str:
 
 
 def load_doctype_module(doctype, module=None, prefix="", suffix=""):
-	"""Returns the module object for given doctype.
+	"""Return the module object for given doctype.
 
 	Note: This will return the standard defined module object for the doctype irrespective
 	of the `override_doctype_class` hook.
@@ -322,9 +344,7 @@ def get_app_publisher(module: str) -> str:
 	return frappe.get_hooks(hook="app_publisher", app_name=app)[0]
 
 
-def make_boilerplate(
-	template: str, doc: Union["Document", "frappe._dict"], opts: Union[dict, "frappe._dict"] = None
-):
+def make_boilerplate(template: str, doc: "Document" | "frappe._dict", opts: dict | "frappe._dict" = None):
 	target_path = get_doc_path(doc.module, doc.doctype, doc.name)
 	template_name = template.replace("controller", scrub(doc.name))
 	if template_name.endswith("._py"):
@@ -350,33 +370,36 @@ def make_boilerplate(
 		base_class_import = "from frappe.utils.nestedset import NestedSet"
 
 	if doc.get("is_virtual"):
-		controller_body = indent(
-			dedent(
-				"""
+		controller_body = """
 			def db_insert(self, *args, **kwargs):
-				pass
+				raise NotImplementedError
 
-			def load_from_db(self):
-				pass
+			def load_from_db(self, *args, **kwargs):
+				raise NotImplementedError
 
-			def db_update(self):
+			def db_update(self, *args, **kwargs):
+				raise NotImplementedError
+
+			def delete(self, *args, **kwargs):
+				raise NotImplementedError
+		"""
+
+		if not doc.get("istable"):
+			controller_body += """
+			@staticmethod
+			def get_list(filters=None, page_length=20, **kwargs):
 				pass
 
 			@staticmethod
-			def get_list(args):
+			def get_count(filters=None, **kwargs):
 				pass
 
 			@staticmethod
-			def get_count(args):
-				pass
-
-			@staticmethod
-			def get_stats(args):
+			def get_stats(**kwargs):
 				pass
 			"""
-			),
-			"\t",
-		)
+
+		controller_body = indent(dedent(controller_body), "\t")
 
 	with open(target_file_path, "w") as target, open(template_file_path) as source:
 		template = source.read()
@@ -391,3 +414,24 @@ def make_boilerplate(
 			custom_controller=controller_body,
 		)
 		target.write(frappe.as_unicode(controller_file_content))
+
+
+def create_directory_on_app_path(folder_name, app_name):
+	app_path = frappe.get_app_path(app_name)
+	folder_path = os.path.join(app_path, folder_name)
+
+	if not os.path.exists(folder_path):
+		frappe.create_folder(folder_path)
+
+	return folder_path
+
+
+def get_app_level_directory_path(folder_name, app_name):
+	app_path = frappe.get_app_path(app_name)
+	path = os.path.join(app_path, folder_name)
+	return path
+
+
+def delete_app_level_folder(folder_name, app_name):
+	path = get_app_level_directory_path(folder_name, app_name)
+	shutil.rmtree(path, ignore_errors=True)

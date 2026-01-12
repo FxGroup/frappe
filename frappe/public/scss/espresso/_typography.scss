@@ -7,7 +7,7 @@
 	--text-2xs: 12px;
 	--text-xs: 12px;
 	--text-sm: 13px;
-	--text-md: 13px; // alias
+	--text-md: 14px; // alias
 	--text-base: 14px;
 	--text-lg: 16px;
 	--text-xl: 18px;
@@ -52,6 +52,9 @@
 	--text-dark: var(--fg-color);
 }
 
+.text-ink-gray-7 {
+	color: var(--ink-gray-7);
+}
 $weight-list: "regular", "medium", "semibold", "bold", "black";
 
 $letter-space: (
@@ -97,4 +100,10 @@ $letter-space-heavy: (
 	@if $name == "tiny" {
 		text-transform: "uppercase";
 	}
+}
+
+@mixin truncate {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

@@ -4,7 +4,6 @@
 import frappe
 from frappe import _
 from frappe.boot import get_allowed_report_names
-from frappe.config import get_modules_from_all_apps_for_user
 from frappe.model.document import Document
 from frappe.model.naming import append_number_if_name_exists
 from frappe.modules.export_file import export_to_files
@@ -12,6 +11,7 @@ from frappe.permissions import get_doctypes_with_read
 from frappe.query_builder import Criterion
 from frappe.query_builder.utils import DocType
 from frappe.utils import flt
+from frappe.utils.modules import get_modules_from_all_apps_for_user
 
 
 class NumberCard(Document):
@@ -47,6 +47,7 @@ class NumberCard(Document):
 		type: DF.Literal["Document Type", "Report", "Custom"]
 
 	# end: auto-generated types
+
 	def autoname(self):
 		if not self.name:
 			self.name = self.label
@@ -125,19 +126,21 @@ def get_result(doc, filters, to_date=None):
 	doc = frappe.parse_json(doc)
 	fields = []
 	sql_function_map = {
-		"Count": "count",
-		"Sum": "sum",
-		"Average": "avg",
-		"Minimum": "min",
-		"Maximum": "max",
+		"Count": "COUNT",
+		"Sum": "SUM",
+		"Average": "AVG",
+		"Minimum": "MIN",
+		"Maximum": "MAX",
 	}
 
 	function = sql_function_map[doc.function]
 
-	if function == "count":
-		fields = [f"{function}(*) as result"]
+	if function == "COUNT":
+		arg = "*"
 	else:
-		fields = [f"{function}({doc.aggregate_function_based_on}) as result"]
+		arg = doc.aggregate_function_based_on
+
+	fields = [{function: arg, "as": "result"}]
 
 	if not filters:
 		filters = []
@@ -204,12 +207,10 @@ def create_number_card(args):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_cards_for_user(doctype, txt, searchfield, start, page_len, filters):
+	doctype = "Number Card"
 	meta = frappe.get_meta(doctype)
 	searchfields = meta.get_search_fields()
 	search_conditions = []
-
-	if not frappe.db.exists("DocType", doctype):
-		return
 
 	numberCard = DocType("Number Card")
 
@@ -219,7 +220,6 @@ def get_cards_for_user(doctype, txt, searchfield, start, page_len, filters):
 	condition_query = frappe.qb.get_query(
 		doctype,
 		filters=filters,
-		validate_filters=True,
 	)
 
 	return (

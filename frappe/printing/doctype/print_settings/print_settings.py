@@ -24,6 +24,7 @@ class PrintSettings(Document):
 		enable_raw_printing: DF.Check
 		font: DF.Literal["Default", "Helvetica Neue", "Arial", "Helvetica", "Inter", "Verdana", "Monospace"]
 		font_size: DF.Float
+		pdf_generator: DF.Literal["wkhtmltopdf", "chrome"]
 		pdf_page_height: DF.Float
 		pdf_page_size: DF.Literal[
 			"A0",
@@ -65,6 +66,7 @@ class PrintSettings(Document):
 		with_letterhead: DF.Check
 
 	# end: auto-generated types
+
 	def validate(self):
 		if self.pdf_page_size == "Custom" and not (self.pdf_page_height and self.pdf_page_width):
 			frappe.throw(_("Page height and width cannot be zero"))

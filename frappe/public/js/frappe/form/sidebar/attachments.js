@@ -123,10 +123,8 @@ frappe.ui.form.Attachments = class Attachments {
 		var me = this;
 
 		let file_label = `
-			<a href="${frappe.utils.escape_html(file_url)}" target="_blank" title="${frappe.utils.escape_html(
-			file_name
-		)}"
-				class="ellipsis" style="max-width: calc(100% - 43px);"
+			<a href="${file_url}" target="_blank" title="${frappe.utils.escape_html(file_name)}"
+				class="ellipsis attachment-file-label ellipsis-width"
 			>
 				<span>${frappe.utils.xss_sanitise(file_name)}</span>
 			</a>`;
@@ -149,11 +147,11 @@ frappe.ui.form.Attachments = class Attachments {
 			};
 		}
 
-		const icon = `<a href="/app/file/${fileid}">
+		const icon = `<a href="/desk/file/${fileid}" class="attachment-icon">
 				${frappe.utils.icon(attachment.is_private ? "es-line-lock" : "es-line-unlock", "sm ml-0")}
 			</a>`;
 
-		$(`<li class="attachment-row">`)
+		$(`<div class="attachment-row"></div>`)
 			.append(frappe.get_data_pill(file_label, fileid, remove_action, icon))
 			.insertAfter(this.add_attachment_wrapper);
 	}

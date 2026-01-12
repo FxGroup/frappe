@@ -32,7 +32,7 @@
    "fieldtype": "Data",
    "label": "Email",
    "options": "Email"
-   },
+  },
   {
    "fieldname": "attending",
    "fieldtype": "Select",
@@ -51,7 +51,7 @@
  "permissions": [],
  "quick_entry": 1,
  "row_format": "Dynamic",
- "sort_field": "modified",
+ "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1

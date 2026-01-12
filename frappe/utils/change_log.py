@@ -245,7 +245,6 @@ def check_release_on_github(
 	owner: str, repo: str, current_version: Version
 ) -> tuple[Version, str] | tuple[None, None]:
 	"""Check the latest release for a repo URL on GitHub."""
-	import requests
 
 	if not owner:
 		raise ValueError("Owner cannot be empty")
@@ -374,11 +373,15 @@ def show_update_popup():
 					"""
 			if release_links:
 				message = _("New {} releases for the following apps are available").format(_(update_type))
-				update_message += (
-					"<div class='new-version-log'>{}<div class='new-version-links'>{}</div></div>".format(
-						message, release_links
-					)
-				)
+				update_message += f"<div class='new-version-log'>{message}<div class='new-version-links'>{release_links}</div></div>"
+
+	primary_action = None
+	if on_frappecloud():
+		primary_action = {
+			"label": _("Update from Frappe Cloud"),
+			"client_action": "window.open",
+			"args": f"https://frappecloud.com/dashboard/sites/{frappe.local.site}",
+		}
 
 	primary_action = None
 	if on_frappecloud():
@@ -399,7 +402,7 @@ def show_update_popup():
 
 
 def get_pyproject(app: str) -> dict | None:
-	from tomli import load
+	from tomllib import load
 
 	pyproject_path = frappe.get_app_path(app, "..", "pyproject.toml")
 

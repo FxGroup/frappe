@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 from datetime import timedelta
+from typing import Any
 
 import frappe
 import frappe.desk.reportview
@@ -129,7 +130,7 @@ def generate_report_result(
 
 
 def normalize_result(result, columns):
-	# Converts to list of dicts from list of lists/tuples
+	# Convert to list of dicts from list of lists/tuples
 	data = []
 	column_names = [column["fieldname"] for column in columns]
 	if result and isinstance(result[0], list | tuple):
@@ -199,10 +200,11 @@ def run(
 	is_tree=False,
 	parent_field=None,
 	are_default_filters=True,
+	js_filters=None,
 ):
 	if not user:
 		user = frappe.session.user
-	validate_filters_permissions(report_name, filters, user)
+	validate_filters_permissions(report_name, filters, user, js_filters)
 	report = get_report_doc(report_name)
 	if not frappe.has_permission(report.ref_doctype, "report"):
 		frappe.msgprint(
@@ -366,6 +368,7 @@ def _export_query(form_params, csv_params, populate_response=True):
 	include_indentation = form_params.include_indentation
 	include_filters = form_params.include_filters
 	visible_idx = form_params.visible_idx
+	include_hidden_columns = form_params.include_hidden_columns
 
 	if isinstance(visible_idx, str):
 		visible_idx = json.loads(visible_idx)
@@ -382,8 +385,12 @@ def _export_query(form_params, csv_params, populate_response=True):
 		return
 
 	format_fields(data)
-	xlsx_data, column_widths = build_xlsx_data(
-		data, visible_idx, include_indentation, include_filters=include_filters
+	xlsx_data, column_widths, header_index = build_xlsx_data(
+		data,
+		visible_idx,
+		include_indentation,
+		include_filters=include_filters,
+		include_hidden_columns=include_hidden_columns,
 	)
 
 	if file_format_type == "CSV":
@@ -394,7 +401,13 @@ def _export_query(form_params, csv_params, populate_response=True):
 		file_extension = "csv"
 	elif file_format_type == "Excel":
 		file_extension = "xlsx"
-		content = make_xlsx(xlsx_data, "Query Report", column_widths=column_widths).getvalue()
+		content = make_xlsx(
+			xlsx_data,
+			"Query Report",
+			column_widths=column_widths,
+			header_index=header_index,
+			has_filters=bool(include_filters),
+		).getvalue()
 
 	if include_filters:
 		for value in (data.filters or {}).values():
@@ -433,7 +446,31 @@ def format_fields(data: frappe._dict) -> None:
 					row[index] = round(row[index], col.get("precision"))
 
 
-def build_xlsx_data(data, visible_idx, include_indentation, include_filters=False, ignore_visible_idx=False):
+def build_xlsx_data(
+	data: frappe._dict,
+	visible_idx: list[int],
+	include_indentation: bool,
+	include_filters: bool = False,
+	ignore_visible_idx: bool = False,
+	include_hidden_columns: bool = False,
+) -> tuple[list[list[Any]], list[int], int]:
+	"""
+	Build Excel data structure from report data with proper formatting.
+
+	Args:
+		data: Report data containing columns, result, and filters
+		visible_idx: List of row indices that are visible in the report
+		include_indentation: Whether to include indentation for tree-like data
+		include_filters: Whether to include filter rows at the top of the Excel sheet
+		ignore_visible_idx: Whether to ignore the visible_idx parameter
+		include_hidden_columns: Whether to include columns marked as hidden
+
+	Returns:
+		tuple: A tuple containing:
+			- result: List of rows for the Excel sheet
+			- column_widths: List of column widths for the Excel sheet
+			- header_index: Index of the header row in the result
+	"""
 	EXCEL_TYPES = (
 		str,
 		bool,
@@ -455,6 +492,10 @@ def build_xlsx_data(data, visible_idx, include_indentation, include_filters=Fals
 
 	result = []
 	column_widths = []
+	header_index = 0
+
+	include_hidden_columns = cint(include_hidden_columns)
+	include_indentation = cint(include_indentation)
 
 	if cint(include_filters) and data.filters:
 		filter_data = []
@@ -470,9 +511,12 @@ def build_xlsx_data(data, visible_idx, include_indentation, include_filters=Fals
 		filter_data.append([])
 		result += filter_data
 
+	# header is after filters + 1 empty row
+	header_index = len(result)
+
 	column_data = []
 	for column in data.columns:
-		if column.get("hidden"):
+		if column.get("hidden") and not include_hidden_columns:
 			continue
 		column_data.append(_(column.get("label")))
 		column_width = cint(column.get("width", 0))
@@ -484,27 +528,31 @@ def build_xlsx_data(data, visible_idx, include_indentation, include_filters=Fals
 	# build table from result
 	for row_idx, row in enumerate(data.result):
 		# only pick up rows that are visible in the report
-		if ignore_visible_idx or row_idx in visible_idx:
-			row_data = []
-			if isinstance(row, dict):
-				for col_idx, column in enumerate(data.columns):
-					if column.get("hidden"):
-						continue
-					label = column.get("label")
-					fieldname = column.get("fieldname")
-					cell_value = row.get(fieldname, row.get(label, ""))
-					if not isinstance(cell_value, EXCEL_TYPES):
-						cell_value = cstr(cell_value)
+		if not ignore_visible_idx and row_idx not in visible_idx:
+			continue
 
-					if cint(include_indentation) and "indent" in row and col_idx == 0:
-						cell_value = ("    " * cint(row["indent"])) + cstr(cell_value)
-					row_data.append(cell_value)
-			elif row:
-				row_data = row
+		row_data = []
+		row_is_dict = isinstance(row, dict)
 
-			result.append(row_data)
+		for col_idx, column in enumerate(data.columns):
+			if column.get("hidden") and not include_hidden_columns:
+				continue
 
-	return result, column_widths
+			label = column.get("label")
+			fieldname = column.get("fieldname")
+			cell_value = row.get(fieldname, row.get(label, "")) if row_is_dict else row[col_idx]
+
+			if not isinstance(cell_value, EXCEL_TYPES):
+				cell_value = cstr(cell_value)
+
+			if row_is_dict and include_indentation and "indent" in row and col_idx == 0:
+				cell_value = ("    " * cint(row["indent"])) + cstr(cell_value)
+
+			row_data.append(cell_value)
+
+		result.append(row_data)
+
+	return result, column_widths, header_index
 
 
 def add_total_row(result, columns, meta=None, is_tree=False, parent_field=None):
@@ -660,8 +708,19 @@ def get_filtered_data(ref_doctype, columns, data, user):
 	shared = frappe.share.get_shared(ref_doctype, user)
 	columns_dict = get_columns_dict(columns)
 
-	role_permissions = get_role_permissions(frappe.get_meta(ref_doctype), user)
+	ref_doctype_meta = frappe.get_meta(ref_doctype)
+
+	role_permissions = get_role_permissions(ref_doctype_meta, user)
 	if_owner = role_permissions.get("if_owner", {}).get("report")
+
+	if ref_doctype_meta.get_masked_fields():
+		from frappe.model.db_query import mask_field_value
+
+		# Apply masking to the fields
+		for field in ref_doctype_meta.get_masked_fields():
+			for row in data:
+				val = row.get(field.fieldname)
+				row[field.fieldname] = mask_field_value(field, val)
 
 	if match_filters_per_doctype:
 		for row in data:
@@ -698,11 +757,11 @@ def has_match(
 	columns_dict,
 	user,
 ):
-	"""Returns True if after evaluating permissions for each linked doctype
-	- There is an owner match for the ref_doctype
-	- `and` There is a user permission match for all linked doctypes
+	"""Return True if after evaluating permissions for each linked doctype:
+	        - There is an owner match for the ref_doctype
+	        - `and` There is a user permission match for all linked doctypes
 
-	Returns True if the row is empty
+	Return True if the row is empty.
 
 	Note:
 	Each doctype could have multiple conflicting user permission doctypes.
@@ -829,9 +888,10 @@ def get_linked_doctypes(columns, data):
 
 
 def get_columns_dict(columns):
-	"""Returns a dict with column docfield values as dict
+	"""Return a dict with column docfield values as dict.
+
 	The keys for the dict are both idx and fieldname,
-	so either index or fieldname can be used to search for a column's docfield properties
+	so either index or fieldname can be used to search for a column's docfield properties.
 	"""
 	columns_dict = frappe._dict()
 	for idx, col in enumerate(columns):
@@ -879,25 +939,34 @@ def get_user_match_filters(doctypes, user):
 	return match_filters
 
 
-def validate_filters_permissions(report_name, filters=None, user=None):
+def validate_filters_permissions(report_name, filters=None, user=None, js_filters=None):
 	if not filters:
 		return
+
+	if js_filters is None:
+		js_filters = []
+
+	if isinstance(js_filters, str):
+		js_filters = json.loads(js_filters)
 
 	if isinstance(filters, str):
 		filters = json.loads(filters)
 
 	report = frappe.get_doc("Report", report_name)
-	for field in report.filters:
-		if field.fieldname in filters and field.fieldtype == "Link":
-			linked_doctype = field.options
+
+	for field in report.filters + js_filters:
+		if hasattr(field, "as_dict"):
+			field = field.as_dict()
+		if field.get("fieldname") in filters and field.get("fieldtype") == "Link":
+			linked_doctype = field.get("options")
 			if not has_permission(
-				doctype=linked_doctype, ptype="read", doc=filters[field.fieldname], user=user
+				doctype=linked_doctype, ptype="read", doc=filters[field.get("fieldname")], user=user
 			) and not has_permission(
-				doctype=linked_doctype, ptype="select", doc=filters[field.fieldname], user=user
+				doctype=linked_doctype, ptype="select", doc=filters[field.get("fieldname")], user=user
 			):
 				frappe.throw(
 					_("You do not have permission to access {0}: {1}.").format(
-						linked_doctype, filters[field.fieldname]
+						linked_doctype, filters[field.get("fieldname")]
 					)
 				)
 
