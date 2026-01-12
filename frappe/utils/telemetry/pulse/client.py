@@ -1,9 +1,9 @@
 import time
 from contextlib import suppress
-from json import JSONDecodeError
+
+from orjson import JSONDecodeError
 
 import frappe
-from frappe.rate_limiter import rate_limit
 from frappe.utils import get_request_session
 from frappe.utils.caching import site_cache
 from frappe.utils.frappecloud import on_frappecloud
@@ -11,6 +11,7 @@ from frappe.utils.frappecloud import on_frappecloud
 from .utils import anonymize_user, ensure_http, parse_interval, utc_iso
 
 
+@frappe.whitelist()
 @site_cache(ttl=60 * 60)
 def is_enabled() -> bool:
 	return bool(

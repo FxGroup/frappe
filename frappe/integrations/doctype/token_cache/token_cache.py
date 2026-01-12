@@ -2,15 +2,14 @@
 # License: MIT. See LICENSE
 
 import datetime
-
-import pytz
+from zoneinfo import ZoneInfo
 
 import pytz
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, cstr, get_system_timezone
+from frappe.utils import cint, cstr, get_datetime, get_system_timezone
 
 
 class TokenCache(Document):
@@ -35,6 +34,7 @@ class TokenCache(Document):
 		user: DF.Link | None
 
 	# end: auto-generated types
+
 	def get_auth_header(self):
 		if self.access_token:
 			return {"Authorization": "Bearer " + self.get_password("access_token")}
@@ -75,11 +75,10 @@ class TokenCache(Document):
 		return self
 
 	def get_expires_in(self):
-		system_timezone = pytz.timezone(get_system_timezone())
-		modified = frappe.utils.get_datetime(self.modified)
-		modified = system_timezone.localize(modified)
-		expiry_utc = modified.astimezone(pytz.utc) + datetime.timedelta(seconds=self.expires_in)
-		now_utc = datetime.datetime.now(pytz.utc)
+		system_timezone = ZoneInfo(get_system_timezone())
+		modified: datetime.datetime = get_datetime(self.modified).replace(tzinfo=system_timezone)
+		expiry_utc = modified.astimezone(datetime.UTC) + datetime.timedelta(seconds=self.expires_in)
+		now_utc = datetime.datetime.now(datetime.UTC)
 		return cint((expiry_utc - now_utc).total_seconds())
 
 	def is_expired(self):

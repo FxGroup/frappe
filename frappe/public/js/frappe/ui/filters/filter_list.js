@@ -62,7 +62,7 @@ frappe.ui.FilterGroup = class {
 	}
 
 	set_popover_events() {
-		$(document.body).on("click", (e) => {
+		$(document.body).on("mousedown", (e) => {
 			if (this.wrapper && this.wrapper.is(":visible")) {
 				const in_datepicker =
 					$(e.target).is(".datepicker--cell") ||
@@ -271,6 +271,7 @@ frappe.ui.FilterGroup = class {
 	get_filters() {
 		return this.filters
 			.filter((f) => f.field)
+			.filter((f) => f.get_selected_value() != null)
 			.map((f) => {
 				return f.get_value();
 			});

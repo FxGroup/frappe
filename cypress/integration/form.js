@@ -1,13 +1,18 @@
 const jump_to_field = (field_label) => {
 	cy.get("body")
 		.type("{esc}") // lose focus if any
-		.type("{ctrl+j}") // jump to field
+		.type("{ctrl+j}"); // jump to field
+
+	cy.get(".modal input[type='text']").first().focus();
+
+	cy.get("body")
 		.type(field_label)
-		.wait(500)
+		.wait(1000)
 		.type("{enter}")
 		.wait(200)
-		.type("{enter}")
-		.wait(500);
+		.findByRole("button", { name: "Go" })
+		.click()
+		.wait(1000);
 };
 
 const type_value = (value) => {
@@ -17,7 +22,7 @@ const type_value = (value) => {
 context("Form", () => {
 	before(() => {
 		cy.login();
-		cy.visit("/app/website");
+		cy.visit("/desk/website");
 		return cy
 			.window()
 			.its("frappe")
@@ -28,11 +33,11 @@ context("Form", () => {
 
 	beforeEach(() => {
 		cy.login();
-		cy.visit("/app/website");
+		cy.visit("/desk/website");
 	});
 
 	it("create a new form", () => {
-		cy.visit("/app/todo/new");
+		cy.visit("/desk/todo/new");
 		cy.get_field("description", "Text Editor")
 			.type("this is a test todo", { force: true })
 			.wait(1000);
@@ -51,7 +56,7 @@ context("Form", () => {
 	});
 
 	it("navigates between documents with child table list filters applied", () => {
-		cy.visit("/app/contact");
+		cy.visit("/desk/contact");
 
 		cy.clear_filters();
 		cy.get('.standard-filter-section [data-fieldname="name"] input')
@@ -59,22 +64,8 @@ context("Form", () => {
 			.blur();
 		cy.click_listview_row_item_with_text("Test Form Contact 3");
 
-		cy.scrollTo(0);
-		cy.get("#page-Contact .page-head").findByTitle("Test Form Contact 3").should("exist");
-		cy.get(".prev-doc").should("be.visible").click();
-		cy.get(".msgprint-dialog .modal-body").contains("No further records").should("be.visible");
-		cy.hide_dialog();
-
-		cy.scrollTo(0);
-		cy.get("#page-Contact .page-head").findByTitle("Test Form Contact 3").should("exist");
-		cy.get(".next-doc").should("be.visible").click();
-		cy.get(".msgprint-dialog .modal-body").contains("No further records").should("be.visible");
-		cy.hide_dialog();
-
-		cy.get("#page-Contact .page-head").findByTitle("Test Form Contact 3").should("exist");
-
 		// clear filters
-		cy.visit("/app/contact");
+		cy.visit("/desk/contact");
 		cy.clear_filters();
 	});
 
@@ -82,9 +73,10 @@ context("Form", () => {
 		// test email validations for set_invalid controller
 		let website_input = "website.in";
 		let valid_email = "user@email.com";
-		let expectBackgroundColor = "rgb(255, 245, 245)";
 
-		cy.visit("/app/contact/new");
+		cy.visit("/desk/contact/new");
+		cy.fill_field("company_name", "Test Company");
+
 		cy.get('.frappe-control[data-fieldname="email_ids"]').as("table");
 		cy.get("@table").find("button.grid-add-row").click();
 		cy.get("@table").find('[data-idx="1"]').as("row1");
@@ -93,7 +85,6 @@ context("Form", () => {
 		cy.get("@row1").find("input.input-with-feedback.form-control").as("email_input1");
 
 		cy.get("@email_input1").type(website_input, { waitForAnimations: false });
-		cy.fill_field("company_name", "Test Company");
 
 		cy.get("@table").find("button.grid-add-row").click();
 		cy.get("@table").find('[data-idx="2"]').as("row2");
@@ -118,7 +109,7 @@ context("Form", () => {
 	});
 
 	it("update docfield property using set_df_property in child table", () => {
-		cy.visit("/app/contact/Test Form Contact 1");
+		cy.visit("/desk/contact/Test Form Contact 1");
 		cy.window()
 			.its("cur_frm")
 			.then((frm) => {

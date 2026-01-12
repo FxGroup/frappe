@@ -40,7 +40,11 @@ describe(
 	() => {
 		before(() => {
 			cy.login();
-			cy.visit(`/app/note/new`);
+			cy.visit(`/desk/note/new`, {
+				onBeforeLoad: (win) => {
+					win.localStorage.setItem("sidebar-expanded", "false");
+				},
+			});
 		});
 
 		test_button_names.forEach((button_name) => {

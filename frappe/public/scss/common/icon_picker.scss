@@ -3,7 +3,8 @@
 	color: var(--text-muted);
 	--icon-picker-width: 240px;
 	width: var(--icon-picker-width);
-	.icons {
+	.icons,
+	.emojis {
 		margin-top: 10px;
 		display: flex;
 		flex-wrap: wrap;
@@ -27,6 +28,13 @@
 			text-align: center;
 			align-items: center;
 		}
+		.emoji-wrapper {
+			font-size: 20px;
+			width: 30px;
+			height: 30px;
+			text-align: center;
+			align-items: center;
+		}
 	}
 
 	.search-icons {
@@ -43,6 +51,9 @@
 			left: 7px;
 		}
 	}
+	.form-tabs-list {
+		margin-top: 2px;
+	}
 }
 .icon-picker-popover {
 	.picker-arrow {
@@ -52,7 +63,7 @@
 
 .frappe-control[data-fieldtype="Icon"] {
 	input {
-		padding-left: 40px;
+		padding-left: 30px;
 	}
 	.selected-icon {
 		cursor: pointer;
@@ -71,6 +82,13 @@
 		.selected-icon {
 			top: 20%;
 			cursor: default;
+		}
+	}
+	.horizontal {
+		.like-disabled-input {
+			.selected-icon {
+				left: 8px;
+			}
 		}
 	}
 }

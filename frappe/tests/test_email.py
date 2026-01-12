@@ -13,13 +13,13 @@ from frappe.desk.form.load import get_attachments
 from frappe.email.doctype.email_account.test_email_account import TestEmailAccount
 from frappe.email.doctype.email_queue.email_queue import QueueBuilder
 from frappe.query_builder.utils import db_type_is
+from frappe.tests import IntegrationTestCase
 from frappe.tests.test_query_builder import run_only_if
-from frappe.tests.utils import FrappeTestCase, change_settings
 
-test_dependencies = ["Email Account"]
+EXTRA_TEST_RECORD_DEPENDENCIES = ["Email Account"]
 
 
-class TestEmail(FrappeTestCase):
+class TestEmail(IntegrationTestCase):
 	def setUp(self):
 		frappe.db.delete("Email Unsubscribe")
 		frappe.db.delete("Email Queue")
@@ -132,6 +132,7 @@ class TestEmail(FrappeTestCase):
 			expose_recipients="footer",
 			now=True,
 		)
+		frappe.db.commit()
 		email_queue = frappe.db.sql("""select name from `tabEmail Queue` where status='Sent'""", as_dict=1)
 		self.assertEqual(len(email_queue), 1)
 		queue_recipients = [
@@ -165,6 +166,7 @@ class TestEmail(FrappeTestCase):
 			unsubscribe_message="Unsubscribe",
 			now=True,
 		)
+		frappe.db.commit()
 		email_queue = frappe.db.sql("""select name from `tabEmail Queue` where status='Sent'""", as_dict=1)
 		self.assertEqual(len(email_queue), 1)
 		queue_recipients = [
@@ -210,6 +212,7 @@ class TestEmail(FrappeTestCase):
 					message="This mail is queued!",
 					now=True,
 				)
+				frappe.db.commit()
 				email_queue_sender = frappe.db.get_value("Email Queue", {"status": "Sent"}, "sender")
 				self.assertEqual(email_queue_sender, assertion)
 
@@ -336,7 +339,7 @@ class TestEmail(FrappeTestCase):
 			email_account.enable_incoming = False
 
 
-class TestVerifiedRequests(FrappeTestCase):
+class TestVerifiedRequests(IntegrationTestCase):
 	def test_round_trip(self):
 		from frappe.utils import set_request
 		from frappe.utils.verified_command import get_signed_params, verify_request
@@ -350,7 +353,7 @@ class TestVerifiedRequests(FrappeTestCase):
 		frappe.local.request = None
 
 
-class TestEmailIntegrationTest(FrappeTestCase):
+class TestEmailIntegrationTest(IntegrationTestCase):
 	"""Sends email to local SMTP server and verifies correctness.
 
 	SMTP4Dev runs as a service in unit test CI job.
@@ -388,6 +391,7 @@ class TestEmailIntegrationTest(FrappeTestCase):
 		email = frappe.sendmail(
 			sender=sender, recipients=recipients, subject=subject, content=content, now=True
 		)
+		frappe.db.commit()
 		email.reload()
 		self.assertEqual(email.sender, sender)
 		self.assertEqual(len(email.recipients), 2)
@@ -401,8 +405,7 @@ class TestEmailIntegrationTest(FrappeTestCase):
 			self.assertEqual(sent_mail["subject"], subject)
 		self.assertSetEqual(set(recipients.split(",")), {m["to"][0] for m in sent_mails})
 
-	@run_only_if(db_type_is.MARIADB)
-	@change_settings("System Settings", store_attached_pdf_document=1)
+	@IntegrationTestCase.change_settings("System Settings", store_attached_pdf_document=1)
 	def test_store_attachments(self):
 		""" "attach print" feature just tells email queue which document to attach, this is not
 		actually stored unless system setting says so."""
@@ -418,6 +421,7 @@ class TestEmailIntegrationTest(FrappeTestCase):
 			send_email=True,
 			now=True,
 		).get("name")
+		frappe.db.commit()
 
 		communication = frappe.get_doc("Communication", name)
 

@@ -40,10 +40,10 @@
  "links": [
   {
    "link_doctype": "User",
-   "link_fieldname": "role_profile_name"
+   "link_fieldname": "role_profile",
+   "table_fieldname": "role_profiles"
   }
  ],
-
  "modified": "2025-11-15 20:00:18.844434",
  "modified_by": "Administrator",
  "module": "Core",
@@ -75,8 +75,10 @@
    "write": 1
   }
  ],
- "sort_field": "modified",
+ "row_format": "Dynamic",
+ "sort_field": "creation",
  "sort_order": "DESC",
+ "states": [],
  "title_field": "role_profile",
  "track_changes": 1,
  "translated_doctype": 1

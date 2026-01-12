@@ -34,7 +34,7 @@ class DeletedDocument(Document):
 		from frappe.query_builder.functions import Now
 
 		table = frappe.qb.DocType("Deleted Document")
-		frappe.db.delete(table, filters=(table.modified < (Now() - Interval(days=days))))
+		frappe.db.delete(table, filters=(table.creation < (Now() - Interval(days=days))))
 
 
 @frappe.whitelist()
@@ -45,7 +45,7 @@ def restore(name, alert=True):
 		frappe.throw(_("Document {0} Already Restored").format(name), exc=frappe.DocumentAlreadyRestored)
 
 	doc = frappe.get_doc(json.loads(deleted.data))
-
+	doc.flags.from_restore = True
 	try:
 		doc.insert()
 	except frappe.DocstatusTransitionError:

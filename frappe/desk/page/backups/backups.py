@@ -10,7 +10,7 @@ from frappe.utils.data import convert_utc_to_system_timezone
 
 def get_time(path: Path):
 	return convert_utc_to_system_timezone(
-		datetime.datetime.fromtimestamp(path.stat().st_mtime, tz=datetime.timezone.utc)
+		datetime.datetime.fromtimestamp(path.stat().st_mtime, tz=datetime.UTC)
 	).strftime("%a %b %d %H:%M %Y")
 
 
@@ -31,7 +31,6 @@ def get_size(path: Path):
 def get_context(context):
 	context.no_cache = True
 	backup_limit = frappe.get_system_settings("backup_limit")
-
 	backups_path = Path(get_site_path("private", "backups"))
 	backup_files = [
 		(

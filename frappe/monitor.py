@@ -53,7 +53,7 @@ class Monitor:
 			self.data = frappe._dict(
 				{
 					"site": frappe.local.site,
-					"timestamp": datetime.datetime.now(pytz.UTC),
+					"timestamp": datetime.datetime.now(datetime.UTC),
 					"transaction_type": transaction_type,
 					"uuid": str(uuid.uuid4()),
 				}
@@ -86,7 +86,7 @@ class Monitor:
 
 		if job := rq.get_current_job():
 			self.data.job_id = job.id
-			waitdiff = self.data.timestamp - job.enqueued_at.replace(tzinfo=pytz.UTC)
+			waitdiff = self.data.timestamp - job.enqueued_at.replace(tzinfo=datetime.UTC)
 			self.data.job.wait = int(waitdiff.total_seconds() * 1000000)
 
 	def add_custom_data(self, **kwargs):
@@ -95,7 +95,7 @@ class Monitor:
 
 	def dump(self, response=None):
 		try:
-			timediff = datetime.datetime.now(pytz.UTC) - self.data.timestamp
+			timediff = datetime.datetime.now(datetime.UTC) - self.data.timestamp
 			# Obtain duration in microseconds
 			self.data.duration = int(timediff.total_seconds() * 1000000)
 

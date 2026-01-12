@@ -42,6 +42,7 @@ frappe.ui.form.on("Data Import", {
 			frm.page.set_indicator(__("In Progress"), "orange");
 			frm.trigger("update_primary_action");
 
+			frm.trigger("show_cancel_import_btn");
 			// hide progress when complete
 			if (data.current === data.total) {
 				setTimeout(() => {
@@ -108,7 +109,12 @@ frappe.ui.form.on("Data Import", {
 		if (frm.doc.status !== "Success") {
 			if (!frm.is_new() && frm.has_import_file()) {
 				let label = frm.doc.status === "Pending" ? __("Start Import") : __("Retry");
-				frm.page.set_primary_action(label, () => frm.events.start_import(frm));
+				frm.page.set_primary_action(label, () => {
+					frm.events.start_import(frm);
+					if (label === "Retry") {
+						frm.trigger("show_cancel_import_btn");
+					}
+				});
 			} else {
 				frm.page.set_primary_action(__("Save"), () => frm.save());
 			}
@@ -135,34 +141,29 @@ frappe.ui.form.on("Data Import", {
 				let failed_records = cint(r.message.failed);
 				let total_records = cint(r.message.total_records);
 
-				if (!total_records) return;
-				let action, message;
-				if (frm.doc.import_type === "Insert New Records") {
-					action = "imported";
-				} else {
-					action = "updated";
+				if (!total_records) {
+					return;
 				}
 
-				if (failed_records === 0) {
-					let message_args = [action, successful_records];
-					if (successful_records === 1) {
-						message = __("Successfully {0} 1 record.", message_args);
-					} else {
-						message = __("Successfully {0} {1} records.", message_args);
-					}
+				let message;
+				if (frm.doc.import_type === "Insert New Records") {
+					message = __("Successfully imported {0} out of {1} records.", [
+						successful_records,
+						total_records,
+					]);
 				} else {
-					let message_args = [action, successful_records, total_records];
-					if (successful_records === 1) {
-						message = __(
-							"Successfully {0} {1} record out of {2}. Click on Export Errored Rows, fix the errors and import again.",
-							message_args
+					message = __("Successfully updated {0} out of {1} records.", [
+						successful_records,
+						total_records,
+					]);
+				}
+
+				if (failed_records > 0) {
+					message +=
+						"<br/>" +
+						__(
+							"Please click on 'Export Errored Rows', fix the errors and import again."
 						);
-					} else {
-						message = __(
-							"Successfully {0} {1} records out of {2}. Click on Export Errored Rows, fix the errors and import again.",
-							message_args
-						);
-					}
 				}
 
 				// If the job timed out, display an extra hint
@@ -172,6 +173,26 @@ frappe.ui.form.on("Data Import", {
 
 				frm.dashboard.set_headline(message);
 			},
+		});
+	},
+
+	show_cancel_import_btn(frm) {
+		frm.add_custom_button(__("Cancel Import"), () => {
+			frappe.confirm(
+				__(
+					"This will terminate the job immediately and might be dangerous, are you sure?"
+				),
+				() => {
+					frappe
+						.xcall("frappe.core.doctype.data_import.data_import.stop_data_import", {
+							doc_name: frm.doc.name,
+						})
+						.then((r) => {
+							frappe.show_alert(__("Job Stopped Successfully"));
+							frm.reload_doc();
+						});
+				}
+			);
 		});
 	},
 

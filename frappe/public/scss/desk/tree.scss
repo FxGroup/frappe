@@ -1,3 +1,13 @@
+.treeview {
+	.layout-main-section {
+		margin: auto;
+
+		body:not(.full-width) & {
+			max-width: var(--page-max-width);
+		}
+	}
+}
+
 .tree {
 	padding: var(--padding-sm);
 	.btn-group {

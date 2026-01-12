@@ -14,7 +14,7 @@ frappe.ui.Tags = class {
 
 	setup(parent, placeholder) {
 		this.$ul = parent;
-		this.$input = $(`<input class="tags-input form-control"></input>`);
+		this.$input = $(`<input class="tags-input form-control mt-2"></input>`);
 
 		this.$inputWrapper = this.get_list_element(this.$input);
 		this.$placeholder =
@@ -38,9 +38,18 @@ frappe.ui.Tags = class {
 		};
 
 		this.$input.keypress((e) => {
-			if (e.which == 13 || e.keyCode == 13) select_tag();
+			if (e.which == 13 || e.keyCode == 13) {
+				// Triggers event when <enter> is pressed
+				this.$input.trigger("enter-pressed-in-addtag");
+			}
 		});
 		this.$input.focusout(select_tag);
+
+		this.$input.on("input-selected", () => {
+			// Adds tag if a input is selected
+			select_tag();
+			this.deactivate();
+		});
 
 		this.$input.on("blur", () => {
 			this.deactivate();
@@ -94,7 +103,7 @@ frappe.ui.Tags = class {
 	}
 
 	get_list_element($element, class_name = "") {
-		let $li = $(`<li class="${class_name}"></li>`);
+		let $li = $(`<div class="${class_name}"></div>`);
 		$element.appendTo($li);
 		return $li;
 	}

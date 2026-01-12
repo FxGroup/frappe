@@ -9,10 +9,10 @@ import frappe.model
 import frappe.utils
 from frappe import _
 from frappe.desk.reportview import validate_args
-from frappe.model.db_query import check_parent_permission
+from frappe.desk.search import PAGE_LENGTH_FOR_LINK_VALIDATION, search_widget
 from frappe.model.utils import is_virtual_doctype
 from frappe.utils import attach_expanded_links, get_safe_filters
-from frappe.utils.deprecations import deprecated
+from frappe.utils.caching import http_cache
 
 if TYPE_CHECKING:
 	from frappe.model.document import Document
@@ -39,7 +39,7 @@ def get_list(
 	or_filters=None,
 	expand=None,
 ):
-	"""Returns a list of records by filters, fields, ordering and limit
+	"""Return a list of records by filters, fields, ordering and limit.
 
 	:param doctype: DocType of the data to be queried
 	:param fields: fields to be returned. Default is `name`
@@ -47,8 +47,6 @@ def get_list(
 	:param order_by: Order by this fieldname
 	:param limit_start: Start at this index
 	:param limit_page_length: Number of records to be returned (default 20)"""
-	if frappe.is_table(doctype):
-		check_parent_permission(parent, doctype)
 
 	args = frappe._dict(
 		doctype=doctype,
@@ -91,13 +89,11 @@ def get_count(doctype, filters=None, debug=False, cache=False):
 
 @frappe.whitelist()
 def get(doctype, name=None, filters=None, parent=None):
-	"""Returns a document by name or filters
+	"""Return a document by name or filters.
 
 	:param doctype: DocType of the document to be returned
 	:param name: return document of this `name`
 	:param filters: If name is not set, filter by these values and return the first match"""
-	if frappe.is_table(doctype):
-		check_parent_permission(parent, doctype)
 
 	if name:
 		doc = frappe.get_doc(doctype, name)
@@ -114,13 +110,11 @@ def get(doctype, name=None, filters=None, parent=None):
 
 @frappe.whitelist()
 def get_value(doctype, fieldname, filters=None, as_dict=True, debug=False, parent=None):
-	"""Returns a value form a document
+	"""Return a value from a document.
 
 	:param doctype: DocType to be queried
 	:param fieldname: Field to be returned (default `name`)
 	:param filters: dict or string for identifying the record"""
-	if frappe.is_table(doctype):
-		check_parent_permission(parent, doctype)
 
 	if not frappe.has_permission(doctype, parent_doctype=parent):
 		frappe.throw(_("No permission for {0}").format(_(doctype)), frappe.PermissionError)
@@ -329,7 +323,7 @@ def get_doc_permissions(doctype: str, docname: str):
 	:param doctype: DocType of the document to be evaluated
 	:param docname: `name` of the document to be evaluated
 	"""
-	doc = frappe.get_doc(doctype, docname)
+	doc = frappe.get_lazy_doc(doctype, docname)
 	return {"permissions": frappe.permissions.get_doc_permissions(doc)}
 
 
@@ -342,36 +336,17 @@ def get_password(doctype: str, name: str, fieldname: str):
 	:param fieldname: `fieldname` of the password property
 	"""
 	frappe.only_for("System Manager")
-	return frappe.get_doc(doctype, name).get_password(fieldname)
+	return frappe.get_lazy_doc(doctype, name).get_password(fieldname)
 
 
-@frappe.whitelist()
-@deprecated
-def get_js(items):
-	"""Load JS code files.  Will also append translations
-	and extend `frappe._messages`
+from frappe.deprecation_dumpster import get_js as _get_js
 
-	:param items: JSON list of paths of the js files to be loaded."""
-	items = json.loads(items)
-	out = []
-	for src in items:
-		src = src.strip("/").split("/")
-
-		if ".." in src or src[0] != "assets":
-			frappe.throw(_("Invalid file path: {0}").format("/".join(src)))
-
-		contentpath = os.path.join(frappe.local.sites_path, *src)
-		with open(contentpath) as srcfile:
-			code = frappe.utils.cstr(srcfile.read())
-
-		out.append(code)
-
-	return out
+get_js = frappe.whitelist()(_get_js)
 
 
 @frappe.whitelist(allow_guest=True)
 def get_time_zone():
-	"""Returns default time zone"""
+	"""Return the default time zone."""
 	return {"time_zone": frappe.defaults.get_defaults().get("time_zone")}
 
 
@@ -397,8 +372,7 @@ def attach_file(
 	:param is_private: Attach file as private file (1 or 0)
 	:param docfield: file to attach to (optional)"""
 
-	doc = frappe.get_doc(doctype, docname)
-	doc.check_permission()
+	doc = frappe.get_lazy_doc(doctype, docname, check_permission=True)
 
 	file = frappe.get_doc(
 		{
@@ -422,6 +396,7 @@ def attach_file(
 
 
 @frappe.whitelist()
+@http_cache(max_age=10 * 60)
 def is_document_amended(doctype: str, docname: str):
 	if frappe.permissions.has_permission(doctype):
 		try:
@@ -432,48 +407,84 @@ def is_document_amended(doctype: str, docname: str):
 	return False
 
 
-@frappe.whitelist()
-def validate_link(doctype: str, docname: str, fields=None):
-	if not isinstance(doctype, str):
-		frappe.throw(_("DocType must be a string"))
+@frappe.whitelist(methods=["GET", "POST"])
+def validate_link_and_fetch(
+	doctype: str,
+	docname: str,
+	fields_to_fetch: list[str] | str | None = None,
+	# search_widget parameters
+	query: str | None = None,
+	filters: dict | list | str | None = None,
+	**search_args,
+):
+	if not docname:
+		frappe.throw(_("Document Name must not be empty"))
 
-	if not isinstance(docname, str):
-		frappe.throw(_("Document Name must be a string"))
+	fields_to_fetch = frappe.parse_json(fields_to_fetch)
 
-	if doctype != "DocType":
-		parent_doctype = None
-		if frappe.get_meta(doctype).istable:  # needed for links to child rows
-			parent_doctype = frappe.db.get_value(doctype, docname, "parenttype")
-		if not (
-			frappe.has_permission(doctype, "select", parent_doctype=parent_doctype)
-			or frappe.has_permission(doctype, "read", parent_doctype=parent_doctype)
-		):
-			frappe.throw(
-				_("You do not have Read or Select Permissions for {}").format(frappe.bold(doctype)),
-				frappe.PermissionError,
-			)
+	# only cache is no fields to fetch and request is GET
+	can_cache = not fields_to_fetch and frappe.request.method == "GET"
 
-	values = frappe._dict()
+	# Use search_widget to validate - ensures filters/custom queries are respected
+	# in addition to standard permission checks
+	search_args["txt"] = docname
+	search_result = frappe.call(
+		search_widget,
+		doctype=doctype,
+		query=query,
+		filters=filters,
+		**search_args,
+		for_link_validation=True,
+	)
 
-	if is_virtual_doctype(doctype):
+	if not search_result:
+		return {}  # does not exist or filtered out
+
+	values = None
+	is_virtual_dt = is_virtual_doctype(doctype)
+	if is_virtual_dt:
 		try:
-			frappe.get_doc(doctype, docname)
-			values.name = docname
+			doc = frappe.get_doc(doctype, docname)
+			doc.check_permission("select" if frappe.only_has_select_perm(doctype) else "read")
+			values = {"name": doc.name}
+
 		except frappe.DoesNotExistError:
 			frappe.clear_last_message()
-			frappe.msgprint(
-				_("Document {0} {1} does not exist").format(frappe.bold(doctype), frappe.bold(docname)),
-			)
+	else:
+		# get value in the right case and type (str | int)
+		# for matching with search result
+		columns_to_fetch = ["name"]
+		if frappe.is_table(doctype):
+			columns_to_fetch.append("parenttype")  # for child table permission check
+		values = frappe.db.get_value(doctype, docname, columns_to_fetch, as_dict=True)
+
+	if not values:
+		return {}  # does not exist
+
+	name_to_compare = values["name"]
+	# this will be used to fetch fields later
+	parent_doctype = values.pop("parenttype", None)
+
+	# try to match name in search result
+	# if search_result is large, assume valid link (result may not appear in some custom queries)
+	if len(search_result) < PAGE_LENGTH_FOR_LINK_VALIDATION and not any(
+		item[0] == name_to_compare for item in search_result
+	):
+		return {}  # no permission or filtered out
+
+	# don't cache or fetch for virtual doctypes
+	if is_virtual_dt:
 		return values
 
-	values.name = frappe.db.get_value(doctype, docname, cache=True)
-
-	fields = frappe.parse_json(fields)
-	if not values.name or not fields:
+	if not fields_to_fetch:
+		if can_cache:
+			frappe.local.response_headers.set(
+				"Cache-Control", "private,max-age=1800,stale-while-revalidate=7200"
+			)
 		return values
 
 	try:
-		values.update(get_value(doctype, fields, docname))
+		values.update(get_value(doctype, fields_to_fetch, docname, parent=parent_doctype))
 	except frappe.PermissionError:
 		frappe.clear_last_message()
 		frappe.msgprint(
@@ -488,8 +499,7 @@ def validate_link(doctype: str, docname: str, fields=None):
 
 
 def insert_doc(doc) -> "Document":
-	"""Inserts document and returns parent document object with appended child document
-	if `doc` is child document else returns the inserted document object
+	"""Insert document and return parent document object with appended child document if `doc` is child document else return the inserted document object.
 
 	:param doc: doc to insert (dict)"""
 

@@ -80,7 +80,7 @@ def is_a_user_permission_key(key):
 
 
 def not_in_user_permission(key, value, user=None):
-	# returns true or false based on if value exist in user permission
+	# return true or false based on if value exist in user permission
 	user = user or frappe.session.user
 	user_permission = get_user_permissions(user).get(frappe.unscrub(key)) or []
 
@@ -173,6 +173,9 @@ def set_default(key, value, parent, parenttype="__default"):
 	else:
 		_clear_cache(parent)
 
+	if parent:
+		clear_defaults_cache(parent)
+
 
 def add_default(key, value, parent, parenttype=None):
 	d = frappe.get_doc(
@@ -232,7 +235,9 @@ def clear_default(key=None, value=None, parent=None, name=None, parenttype=None)
 
 def get_defaults_for(parent="__default"):
 	"""get all defaults"""
-	defaults = frappe.cache.hget("defaults", parent)
+
+	key = f"defaults::{parent}"
+	defaults = frappe.client_cache.get_value(key)
 
 	if defaults is None:
 		# sort descending because first default must get precedence
@@ -258,7 +263,7 @@ def get_defaults_for(parent="__default"):
 			elif d.defvalue is not None:
 				defaults[d.defkey] = d.defvalue
 
-		frappe.cache.hset("defaults", parent, defaults)
+		frappe.client_cache.set_value(key, defaults)
 
 	return defaults
 

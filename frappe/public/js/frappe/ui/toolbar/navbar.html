@@ -1,14 +1,7 @@
 <div class="sticky-top">
+	{% if (frappe.boot.read_only || frappe.boot.user.impersonated_by) { %}
 	<header class="navbar navbar-expand" role="navigation">
 		<div class="container">
-			<a class="navbar-brand navbar-home" href="/app">
-				<img
-					class="app-logo"
-					src="{{ frappe.boot.app_logo_url }}"
-					alt="{{ __("App Logo") }}"
-				>
-			</a>
-			<ul class="nav navbar-nav d-none d-sm-flex" id="navbar-breadcrumbs"></ul>
 			<div class="collapse navbar-collapse justify-content-end">
 				<form class="form-inline fill-width justify-content-end" role="search" onsubmit="return false;">
 					{% if (frappe.boot.read_only) { %}
@@ -148,6 +141,7 @@
 			</div>
 		</div>
 	</header>
+	{% endif %}
 
 	{% if !localStorage.getItem("dismissed_announcement_widget") && strip_html(navbar_settings.announcement_widget) != '' %}
 	<div class="announcement-widget form-message p-2 m-0" style="position: relative; z-index: -1; border-radius: 0; background-color: var(--bg-blue);">

@@ -26,7 +26,7 @@ frappe.ui.form.on("Web Form", {
 	refresh: function (frm) {
 		// get iframe url for web form
 		frm.sidebar
-			.add_user_action(__("Copy Embed Code"))
+			.add_user_action(__("Copy embed code"))
 			.attr("href", "#")
 			.on("click", () => {
 				const url = frappe.urllib.get_full_url(frm.doc.route);
@@ -82,7 +82,7 @@ frappe.ui.form.on("Web Form", {
 
 		if (!frm.doc.web_form_fields) {
 			frm.scroll_to_field("web_form_fields");
-			frappe.throw(__("Atleast one field is required in Web Form Fields Table"));
+			frappe.throw(__("At least one field is required in Web Form Fields Table"));
 		}
 
 		let page_break_count = frm.doc.web_form_fields.filter(
@@ -130,6 +130,9 @@ frappe.ui.form.on("Web Form", {
 							read_only: df.read_only,
 							precision: df.precision,
 							depends_on: df.depends_on,
+							placeholder: df.placeholder,
+							max_length: df.length,
+							description: df.description,
 							mandatory_depends_on: df.mandatory_depends_on,
 							read_only_depends_on: df.read_only_depends_on,
 						});
@@ -362,7 +365,10 @@ frappe.ui.form.on("Web Form Field", {
 		doc.default = df.default;
 		doc.read_only = df.read_only;
 		doc.depends_on = df.depends_on;
+		doc.placeholder = df.placeholder;
+		doc.description = df.description;
 		doc.mandatory_depends_on = df.mandatory_depends_on;
+		doc.max_length = df.length;
 		doc.read_only_depends_on = df.read_only_depends_on;
 
 		frm.refresh_field("web_form_fields");

@@ -7,6 +7,9 @@ import re
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Optional
+from uuid import UUID
+
+import uuid_utils
 
 import frappe
 from frappe import _
@@ -37,6 +40,10 @@ NAMING_SERIES_PART_TYPES = (
 
 
 class InvalidNamingSeriesError(frappe.ValidationError):
+	pass
+
+
+class InvalidUUIDValue(frappe.ValidationError):
 	pass
 
 
@@ -151,11 +158,23 @@ def set_new_name(doc):
 	meta = frappe.get_meta(doc.doctype)
 	autoname = meta.autoname or ""
 
-	if autoname.lower() != "prompt" and not frappe.flags.in_import:
+	if autoname.lower() not in ("prompt", "uuid") and not frappe.flags.in_import:
 		doc.name = None
 
 	if is_autoincremented(doc.doctype, meta):
 		doc.name = frappe.db.get_next_sequence_val(doc.doctype)
+		return
+
+	if meta.autoname == "UUID":
+		if not doc.name:
+			doc.name = str(uuid_utils.uuid7())
+		elif isinstance(doc.name, UUID | uuid_utils.UUID):
+			doc.name = str(doc.name)
+		elif isinstance(doc.name, str):  # validate
+			try:
+				UUID(doc.name)
+			except ValueError:
+				frappe.throw(_("Invalid value specified for UUID: {}").format(doc.name), InvalidUUIDValue)
 		return
 
 	if getattr(doc, "amended_from", None):
@@ -182,16 +201,13 @@ def set_new_name(doc):
 	doc.name = validate_name(doc.doctype, doc.name)
 
 
-def is_autoincremented(doctype: str, meta: Optional["Meta"] = None) -> bool:
+def is_autoincremented(doctype: str, meta: "Meta" | None = None) -> bool:
 	"""Checks if the doctype has autoincrement autoname set"""
 
 	if not meta:
 		meta = frappe.get_meta(doctype)
 
-	if not getattr(meta, "issingle", False) and meta.autoname == "autoincrement":
-		return True
-
-	return False
+	return not getattr(meta, "issingle", False) and meta.autoname == "autoincrement"
 
 
 @redis_cache
@@ -324,7 +340,7 @@ def _generate_random_string(length=10):
 def parse_naming_series(
 	parts: list[str] | str,
 	doctype=None,
-	doc: Optional["Document"] = None,
+	doc: "Document" | None = None,
 	number_generator: Callable[[str, int], str] | None = None,
 ) -> str:
 	"""Parse the naming series and get next name.
@@ -355,6 +371,8 @@ def parse_naming_series(
 				digits = len(e)
 				part = number_generator(name, digits)
 				series_set = True
+		elif method := has_custom_parser(e):
+			part = frappe.get_attr(method[0])(doc, e)
 		elif e == "YY":
 			part = today.strftime("%y")
 		elif e == "MM":
@@ -363,6 +381,8 @@ def parse_naming_series(
 			part = today.strftime("%d")
 		elif e == "YYYY":
 			part = today.strftime("%Y")
+		elif e == "JJJ":
+			part = today.strftime("%j")
 		elif e == "WW":
 			part = determine_consecutive_week_number(today)
 		elif e == "timestamp":
@@ -370,8 +390,6 @@ def parse_naming_series(
 		elif doc and (e.startswith("{") or doc.get(e, _sentinel) is not _sentinel):
 			e = e.replace("{", "").replace("}", "")
 			part = doc.get(e)
-		elif method := has_custom_parser(e):
-			part = frappe.get_attr(method[0])(doc, e)
 		else:
 			part = e
 
@@ -384,7 +402,7 @@ def parse_naming_series(
 
 
 def has_custom_parser(e):
-	"""Returns true if the naming series part has a custom parser"""
+	"""Return True if the naming series part has a custom parser."""
 	return frappe.get_hooks("naming_series_variables", {}).get(e)
 
 

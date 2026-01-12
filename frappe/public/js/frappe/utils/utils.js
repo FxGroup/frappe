@@ -3,7 +3,6 @@
 
 import deep_equal from "fast-deep-equal";
 import number_systems from "./number_systems";
-import cloneDeepWith from "lodash/cloneDeepWith";
 
 frappe.provide("frappe.utils");
 
@@ -54,6 +53,13 @@ String.prototype.plural = function (revert) {
 		"(octop)us$": "$1i",
 		"(ax|test)is$": "$1es",
 		"(us)$": "$1es",
+		"(f)oot$": "$1eet",
+		"(g)oose$": "$1eese",
+		"(sex)$": "$1es",
+		"(child)$": "$1ren",
+		"(m)an$": "$1en",
+		"(t)ooth$": "$1eeth",
+		"(pe)rson$": "$1ople",
 		"([^s]+)$": "$1s",
 	};
 
@@ -85,18 +91,14 @@ String.prototype.plural = function (revert) {
 		"(h|bl)ouses$": "$1ouse",
 		"(corpse)s$": "$1",
 		"(us)es$": "$1",
+		"(f)eet$": "$1oot",
+		"(g)eese$": "$1oose",
+		"(sex)es$": "$1",
+		"(child)ren$": "$1",
+		"(m)en$": "$1an",
+		"(t)eeth$": "$1ooth",
+		"(pe)ople$": "$1rson",
 		s$: "",
-	};
-
-	const irregular = {
-		move: "moves",
-		foot: "feet",
-		goose: "geese",
-		sex: "sexes",
-		child: "children",
-		man: "men",
-		tooth: "teeth",
-		person: "people",
 	};
 
 	const uncountable = [
@@ -115,29 +117,12 @@ String.prototype.plural = function (revert) {
 	// save some time in the case that singular and plural are the same
 	if (uncountable.indexOf(this.toLowerCase()) >= 0) return this;
 
-	// check for irregular forms
-	let word;
-	let pattern;
-	let replace;
-	for (word in irregular) {
-		if (revert) {
-			pattern = new RegExp(irregular[word] + "$", "i");
-			replace = word;
-		} else {
-			pattern = new RegExp(word + "$", "i");
-			replace = irregular[word];
-		}
-		if (pattern.test(this)) return this.replace(pattern, replace);
-	}
-
-	let array;
-	if (revert) array = singular;
-	else array = plural;
-
 	// check for matches using regular expressions
+	const array = revert ? singular : plural;
+
 	let reg;
 	for (reg in array) {
-		pattern = new RegExp(reg, "i");
+		const pattern = new RegExp(reg, "i");
 
 		if (pattern.test(this)) return this.replace(pattern, array[reg]);
 	}
@@ -308,6 +293,9 @@ Object.assign(frappe.utils, {
 				</a></p>'
 			);
 		return content.html();
+	},
+	scroll_page_to_top() {
+		$(".main-section").scrollTop(0);
 	},
 	scroll_to: function (
 		element,
@@ -895,19 +883,40 @@ Object.assign(frappe.utils, {
 		};
 	},
 	debounce: function (func, wait, immediate) {
-		var timeout;
-		return function () {
-			var context = this,
-				args = arguments;
-			var later = function () {
-				timeout = null;
-				if (!immediate) func.apply(context, args);
-			};
+		var timeout, context, args;
+
+		var later = function () {
+			timeout = null;
+			if (!immediate) func.apply(context, args);
+		};
+
+		var debounced = function () {
+			context = this;
+			args = arguments;
 			var callNow = immediate && !timeout;
 			clearTimeout(timeout);
 			timeout = setTimeout(later, wait);
 			if (callNow) func.apply(context, args);
 		};
+
+		debounced.cancel = function () {
+			if (!timeout) return false;
+
+			clearTimeout(timeout);
+			timeout = null;
+			return true;
+		};
+
+		debounced.flush = function () {
+			if (!timeout) return false;
+
+			clearTimeout(timeout);
+			timeout = null;
+			func.apply(context, args);
+			return true;
+		};
+
+		return debounced;
 	},
 	get_form_link: function (
 		doctype,
@@ -918,7 +927,9 @@ Object.assign(frappe.utils, {
 	) {
 		display_text = display_text || name;
 		name = encodeURIComponent(name);
-		let route = `/app/${encodeURIComponent(doctype.toLowerCase().replace(/ /g, "-"))}/${name}`;
+		let route = `/desk/${encodeURIComponent(
+			doctype.toLowerCase().replace(/ /g, "-")
+		)}/${name}`;
 		if (query_params_obj) {
 			route += frappe.utils.make_query_string(query_params_obj);
 		}
@@ -931,16 +942,19 @@ Object.assign(frappe.utils, {
 		let route = route_str.split("/");
 
 		if (route[2] === "Report" || route[0] === "query-report") {
-			return __("{0} Report", [__(route[3]) || __(route[1])]);
+			return (__(route[3]) || __(route[1])).bold() + " " + __("Report");
 		}
 		if (route[0] === "List") {
-			return __("{0} List", [__(route[1])]);
+			return __(route[1]).bold() + " " + __("List");
 		}
 		if (route[0] === "modules") {
-			return __("{0} Modules", [__(route[1])]);
+			return __(route[1]).bold() + " " + __("Module");
+		}
+		if (route[0] === "Workspaces") {
+			return __(route[1]).bold() + " " + __("Workspace");
 		}
 		if (route[0] === "dashboard") {
-			return __("{0} Dashboard", [__(route[1])]);
+			return __(route[1]).bold() + " " + __("Dashboard");
 		}
 		return __(frappe.utils.to_title_case(__(route[0]), true));
 	},
@@ -965,25 +979,54 @@ Object.assign(frappe.utils, {
 		const $search_input = $wrapper.find('[data-element="search"]').show();
 		$search_input.focus().val("");
 		const $elements = $wrapper.find(el_class).show();
+		const $multichecks = $wrapper.find('[data-fieldtype="MultiCheck"]');
+
+		let $no_results = $wrapper.find(".no-results-message");
+		if (!$no_results.length) {
+			$no_results = $(`
+				<div class="no-results-message text-muted text-center" style="padding: 5px; display: none;">
+					${__("No values to show")}
+				</div>
+			`).appendTo($wrapper);
+		}
+
+		$no_results.hide();
+
+		const matches_filter = ($el, filter) => {
+			const $text_el = $el.find(text_class);
+			const text = $text_el.text().toLowerCase();
+
+			let name = "";
+			if (data_attr && $text_el.attr(data_attr)) {
+				name = $text_el.attr(data_attr).toLowerCase();
+			}
+
+			return text.includes(filter) || name.includes(filter);
+		};
 
 		$search_input.off("keyup").on("keyup", () => {
-			let text_filter = $search_input.val().toLowerCase();
-			// Replace trailing and leading spaces
-			text_filter = text_filter.replace(/^\s+|\s+$/g, "");
-			for (let i = 0; i < $elements.length; i++) {
-				const text_element = $elements.eq(i).find(text_class);
-				const text = text_element.text().toLowerCase();
+			const text_filter = $search_input.val().toLowerCase().trim();
+			let any_visible = false;
 
-				let name = "";
-				if (data_attr && text_element.attr(data_attr)) {
-					name = text_element.attr(data_attr).toLowerCase();
-				}
+			$elements.each(function () {
+				const match = matches_filter($(this), text_filter);
+				$(this).toggle(match);
+				if (match) any_visible = true;
+			});
 
-				if (text.includes(text_filter) || name.includes(text_filter)) {
-					$elements.eq(i).css("display", "");
-				} else {
-					$elements.eq(i).css("display", "none");
-				}
+			if ($multichecks.length) {
+				$multichecks.show();
+
+				$multichecks.each(function () {
+					const has_visible = $(this).find(el_class + ":visible").length;
+					$(this).toggle(!!has_visible);
+				});
+			}
+
+			if (text_filter) {
+				$no_results.toggle(!any_visible);
+			} else {
+				$no_results.hide();
 			}
 		});
 	},
@@ -1003,10 +1046,6 @@ Object.assign(frappe.utils, {
 
 	deep_equal(a, b) {
 		return deep_equal(a, b);
-	},
-
-	deep_clone(obj, customizer) {
-		return cloneDeepWith(obj, customizer);
 	},
 
 	file_name_ellipsis(filename, length) {
@@ -1037,11 +1076,11 @@ Object.assign(frappe.utils, {
 		}
 		return decoded;
 	},
-	copy_to_clipboard(string) {
+	copy_to_clipboard(string, message) {
 		const show_success_alert = () => {
 			frappe.show_alert({
 				indicator: "green",
-				message: __("Copied to clipboard."),
+				message: message || __("Copied to clipboard."),
 			});
 		};
 		if (navigator.clipboard && window.isSecureContext) {
@@ -1074,6 +1113,9 @@ Object.assign(frappe.utils, {
 	},
 
 	eval(code, context = {}) {
+		if (code.substr(0, 5) == "eval:") {
+			code = code.substr(5);
+		}
 		let variable_names = Object.keys(context);
 		let variables = Object.values(context);
 		code = `let out = ${code}; return out`;
@@ -1209,15 +1251,137 @@ Object.assign(frappe.utils, {
 	map_defaults: {
 		center: [19.08, 72.8961],
 		zoom: 13,
-		tiles: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-		options: {
-			attribution:
-				'&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
+		tiles: {
+			default_tile: {
+				url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+				options: {
+					attribution:
+						'&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
+				},
+			},
+			satellite_tile: {
+				url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+				options: {
+					attribution: "© Esri © OpenStreetMap Contributors",
+				},
+			},
+			labels_tail: {
+				url: "https://tiles.stadiamaps.com/tiles/stamen_toner_labels/{z}/{x}/{y}{r}.png",
+				options: {
+					attribution:
+						'&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a>',
+				},
+			},
+			terrain_lines_tail: {
+				url: "https://tiles.stadiamaps.com/tiles/stamen_terrain_lines/{z}/{x}/{y}{r}.png",
+				options: {
+					attribution:
+						'&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a>',
+				},
+			},
 		},
 		image_path: "/assets/frappe/images/leaflet/",
 	},
+	get_route_for_icon(desktop_icon) {
+		let route;
+		if (!desktop_icon) return;
+		let item = {};
+		if (desktop_icon.link_type == "External" && desktop_icon.link) {
+			route = window.location.origin + desktop_icon.link;
+		} else {
+			let sidebar = frappe.boot.workspace_sidebar_item[desktop_icon.label.toLowerCase()];
+			if (desktop_icon.link_type == "Workspace Sidebar" && sidebar) {
+				let first_link = sidebar.items.find((i) => i.type == "Link");
+				if (first_link) {
+					if (first_link.link_type === "Report") {
+						let args = {
+							type: first_link.link_type,
+							name: first_link.link_to,
+						};
 
-	icon(icon_name, size = "sm", icon_class = "", icon_style = "", svg_class = "") {
+						if (first_link.report || !frappe.app.sidebar.editor.edit_mode) {
+							args.is_query_report =
+								first_link.report.report_type === "Query Report" ||
+								first_link.report.report_type == "Script Report";
+							args.report_ref_doctype = first_link.report.ref_doctype;
+						}
+
+						route = frappe.utils.generate_route(args);
+					} else if (first_link.link_type == "Workspace") {
+						let workspaces = frappe.workspaces[frappe.router.slug(first_link.link_to)];
+						if (workspaces) {
+							if (workspaces.public) {
+								route = "/desk/" + frappe.router.slug(first_link.link_to);
+							} else {
+								route = "/desk/private/" + frappe.router.slug(workspaces.title);
+							}
+						}
+
+						if (first_link.route) {
+							route = first_link.route;
+						}
+					} else if (first_link.link_type === "URL") {
+						route = first_link.url;
+					} else if (first_link.link_type == "Page" && first_link.route_options) {
+						route = frappe.utils.generate_route({
+							type: first_link.link_type,
+							name: first_link.link_to,
+							route_options: JSON.parse(first_link.route_options),
+						});
+					} else {
+						route = frappe.utils.generate_route({
+							type: first_link.link_type,
+							name: first_link.link_to,
+							tab: first_link.tab,
+						});
+					}
+				}
+			}
+		}
+		return route;
+	},
+	desktop_icon(label, color, size) {
+		let letter = label.charAt(0).toUpperCase();
+		let icon_size = size ? size : "md";
+		let opacity_hex = "1A";
+		let icon_html = $(`
+			<div class="icon-container">
+				<svg fill="currentColor" class="desktop-alphabet icon text-ink-gray-7 icon-${icon_size}" stroke=none style="" aria-hidden="true">
+				<use class="" href="#${letter}"></use>
+				</svg>
+			</div>
+		`);
+		let pallete_color = this.desktop_pallete[color || "blue"];
+		let bg_color = pallete_color + opacity_hex;
+		let stroke_color = pallete_color;
+		if (frappe.boot.desktop_icon_style == "Solid") {
+			bg_color = stroke_color;
+			stroke_color = "var(--white)";
+		}
+		icon_html.css("backgroundColor", bg_color);
+		icon_html.find("svg").css("color", stroke_color);
+		return icon_html.get(0).outerHTML;
+	},
+	desktop_pallete: {
+		blue: "#0981E3",
+		gray: "#7B808A",
+	},
+	desktop_bg_color(color_name) {
+		let color_value = this.desktop_pallete[color_name];
+		color_value + "";
+	},
+	icon(
+		icon_name,
+		size = "sm",
+		icon_class = "",
+		icon_style = "",
+		svg_class = "",
+		current_color = false,
+		stroke_color = null
+	) {
+		if (frappe.utils.is_emoji(icon_name)) {
+			return `<span>${icon_name}</span>`;
+		}
 		let size_class = "";
 		let is_espresso = icon_name.startsWith("es-");
 
@@ -1227,21 +1391,69 @@ Object.assign(frappe.utils, {
 		} else {
 			size_class = `icon-${size}`;
 		}
-		return `<svg class="${
+		let $svg = `<svg class="${
 			is_espresso
 				? icon_name.startsWith("es-solid")
 					? "es-icon es-solid"
 					: "es-icon es-line"
 				: "icon"
-		} ${svg_class} ${size_class}" style="${icon_style}" aria-hidden="true">
-			<use class="${icon_class}" href="${icon_name}"></use>
+		} ${svg_class} ${size_class}"
+			${current_color ? 'stroke="currentColor"' : ""}
+			${stroke_color ? `stroke="${stroke_color}"` : ""}
+			style="${icon_style}" aria-hidden="true">
+			<use class="${icon_class}" href="${icon_name}"
+				${stroke_color ? `stroke="${stroke_color}"` : ""}
+			>
+			</use>
 		</svg>`;
+
+		return $svg;
 	},
 
 	flag(country_code) {
-		return `<img
-		src="https://flagcdn.com/${country_code}.svg"
-		width="20" height="15">`;
+		return `<img loading="lazy" src="https://flagcdn.com/${country_code}.svg" width="20" height="15">`;
+	},
+
+	is_emoji(emoji_name) {
+		let emojiList = gemoji.map((emoji) => emoji.emoji);
+		return emojiList.includes(emoji_name);
+	},
+
+	get_desktop_icon(icon_name, variant) {
+		let exists = false;
+		let icon_data = this.get_desktop_icon_by_label(icon_name);
+		variant = variant.toLowerCase();
+		if (!icon_data?.app) return exists;
+		let app_name = icon_data.app;
+		let icon_url = `assets/${app_name}/icons/desktop_icons/${variant}/${frappe.scrub(
+			icon_name
+		)}.svg`;
+
+		if (
+			frappe.boot.desktop_icon_urls[app_name] &&
+			frappe.boot.desktop_icon_urls[app_name][variant].includes(icon_url)
+		) {
+			return `/${icon_url}`;
+		}
+		return exists;
+	},
+
+	desktop_icon_exists(app_name, url) {
+		let exists = false;
+		if (frappe.boot.desktop_icon_urls[app_name].includes(url)) exists = true;
+		return exists;
+	},
+	get_desktop_icon_by_label(title, filters) {
+		if (!filters) {
+			return frappe.boot.desktop_icons.find((f) => f.label === title);
+		} else {
+			return frappe.boot.desktop_icons.find((f) => {
+				return (
+					f.label === title &&
+					Object.keys(filters).every((key) => f[key] === filters[key])
+				);
+			});
+		}
 	},
 
 	make_chart(wrapper, custom_options = {}) {
@@ -1289,7 +1501,7 @@ Object.assign(frappe.utils, {
 				let doctype_slug = frappe.router.slug(item.doctype);
 
 				if (frappe.model.is_single(item.doctype)) {
-					route = doctype_slug;
+					route = `${doctype_slug}/${item.doctype}`;
 				} else {
 					switch (item.doc_view) {
 						case "List":
@@ -1319,9 +1531,15 @@ Object.assign(frappe.utils, {
 								route += `/${item.kanban_board}`;
 							}
 							break;
+						case "Image":
+							route = `${doctype_slug}/view/image`;
+							break;
 						default:
 							route = doctype_slug;
 					}
+				}
+				if (item.tab) {
+					route += `#${item.tab}`;
 				}
 			} else if (type === "report") {
 				if (item.is_query_report) {
@@ -1353,7 +1571,7 @@ Object.assign(frappe.utils, {
 		// (item.doctype && frappe.model.can_read(item.doctype))) {
 		//     item.shown = true;
 		// }
-		return `/app/${route}`;
+		return `/desk/${route}`;
 	},
 
 	shorten_number: function (number, country, min_length = 4, max_no_of_decimals = 2) {
@@ -1650,9 +1868,17 @@ Object.assign(frappe.utils, {
 	},
 
 	process_filter_expression(filter) {
-		return new Function(`return ${filter}`)();
+		let filters = [];
+		filters = filter ? new Function(`return ${filter}`)() : [];
+		return this.cleanup_filters(filters);
 	},
-
+	cleanup_filters(filters) {
+		if (filters.length && filters[0].length == 5) {
+			filters.pop();
+			return filters;
+		}
+		return filters;
+	},
 	get_filter_from_json(filter_json, doctype) {
 		// convert json to filter array
 		if (filter_json) {
@@ -1670,10 +1896,19 @@ Object.assign(frappe.utils, {
 				// don't remove unless patch is created to convert all existing filters from object to array
 				// backward compatibility
 				if (Array.isArray(filters_json)) {
-					let filter = {};
-					filters_json.forEach((arr) => {
-						filter[arr[1]] = [arr[2], arr[3]];
-					});
+					let filter = filters_json.reduce((acc, filter) => {
+						const field = filter[1];
+						const value = [filter[2], filter[3]];
+
+						// if we have multiple filters for the same field,
+						// we convert it into an array
+						if (acc[field]) {
+							acc[field].push(value);
+						} else {
+							acc[field] = [value];
+						}
+						return acc;
+					}, {});
 					return filter || [];
 				}
 				return filters_json || [];
@@ -1738,7 +1973,10 @@ Object.assign(frappe.utils, {
 				{
 					fieldname: "source",
 					label: __("Source"),
-					fieldtype: "Data",
+					fieldtype: "Link",
+					reqd: 1,
+					options: "UTM Source",
+					description: "The referrer (e.g. google, newsletter)",
 					default: localStorage.getItem("tracker_url:source"),
 				},
 				{
@@ -1746,31 +1984,53 @@ Object.assign(frappe.utils, {
 					label: __("Campaign"),
 					fieldtype: "Link",
 					ignore_link_validation: 1,
-					options: "Marketing Campaign",
+					options: "UTM Campaign",
 					default: localStorage.getItem("tracker_url:campaign"),
 				},
 				{
 					fieldname: "medium",
 					label: __("Medium"),
-					fieldtype: "Data",
+					fieldtype: "Link",
+					options: "UTM Medium",
+					description: "Marketing medium (e.g. cpc, banner, email)",
 					default: localStorage.getItem("tracker_url:medium"),
 				},
+				{
+					fieldname: "content",
+					label: __("Content"),
+					fieldtype: "Data",
+					description: "Use to differentiate ad variants (e.g. A/B testing)",
+					default: localStorage.getItem("tracker_url:content"),
+				},
 			],
-			function (data) {
+			async function (data) {
 				let url = data.url;
 				localStorage.setItem("tracker_url:url", data.url);
 
-				if (data.source) {
-					url += "?source=" + data.source;
-					localStorage.setItem("tracker_url:source", data.source);
-				}
+				const { message } = await frappe.db.get_value("UTM Source", data.source, "slug");
+				url += "?utm_source=" + encodeURIComponent(message.slug || data.source);
+				localStorage.setItem("tracker_url:source", data.source);
 				if (data.campaign) {
-					url += "&campaign=" + data.campaign;
+					const { message } = await frappe.db.get_value(
+						"UTM Campaign",
+						data.campaign,
+						"slug"
+					);
+					url += "&utm_campaign=" + encodeURIComponent(message.slug || data.campaign);
 					localStorage.setItem("tracker_url:campaign", data.campaign);
 				}
 				if (data.medium) {
-					url += "&medium=" + data.medium.toLowerCase();
+					const { message } = await frappe.db.get_value(
+						"UTM Medium",
+						data.medium,
+						"slug"
+					);
+					url += "&utm_medium=" + encodeURIComponent(message.slug || data.medium);
 					localStorage.setItem("tracker_url:medium", data.medium);
+				}
+				if (data.content) {
+					url += "&utm_content=" + encodeURIComponent(data.content);
+					localStorage.setItem("tracker_url:content", data.content);
 				}
 
 				frappe.utils.copy_to_clipboard(url);
@@ -1786,6 +2046,24 @@ Object.assign(frappe.utils, {
 		);
 	},
 	/**
+	 * Checks if a value is empty.
+	 *
+	 * Returns false for: "hello", 0, 1, 3.1415, {"a": 1}, [1, 2, 3]
+	 * Returns true for: "", null, undefined, {}, []
+	 *
+	 * @param {*} value - The value to check.
+	 * @returns {boolean} - Returns `true` if the value is empty, `false` otherwise.
+	 */
+	is_empty(value) {
+		if (!value && value !== 0) return true;
+
+		if (typeof value === "object")
+			return (Array.isArray(value) ? value : Object.keys(value)).length === 0;
+
+		return false;
+	},
+
+	/**
 	 * Masks passwords in an object by replacing the values of keys containing
 	 * "password" or "passphrase" with "*****".
 	 *
@@ -1798,5 +2076,87 @@ Object.assign(frappe.utils, {
 				obj[key] = "*****";
 			}
 		}
+	},
+
+	/**
+	 * Adds syntax highlighting to all <pre> tags in the given jQuery wrapper.
+	 * Example wrapper:
+	 *
+	 * ```html
+	 * <pre><code class="language-python">
+	 * def add(a, b):
+	 *     return a + b
+	 *
+	 * print(add(1, 2))
+	 *
+	 * # Output: 3
+	 * </code></pre>
+	 * ```
+	 *
+	 * @param {jQuery} $wrapper - The jQuery wrapper to add syntax highlighting to.
+	 */
+	highlight_pre($wrapper) {
+		frappe.require("syntax_highlighting.bundle.js").then(() => {
+			$wrapper.find("pre").each(function () {
+				hljs.highlightElement(this);
+			});
+		});
+	},
+
+	/**
+	 * Check if current user can upload public files.
+	 * @returns {boolean}
+	 */
+	can_upload_public_files() {
+		if (
+			Number(frappe.boot.sysdefaults?.only_allow_system_managers_to_upload_public_files) !==
+			1
+		) {
+			return true;
+		}
+		return frappe.user.has_role(["System Manager", "Administrator"]);
+	},
+
+	get_help_siblings() {
+		const navbar_settings = frappe.boot.navbar_settings;
+		let help_dropdown_items = [];
+
+		let custom_help_links = this.get_custom_help_links();
+
+		help_dropdown_items = custom_help_links.concat(help_dropdown_items);
+
+		navbar_settings.help_dropdown.forEach((element) => {
+			let dropdown_children = {
+				name: element.name,
+				label: element.item_label,
+			};
+			if (element.item_type === "Route") {
+				dropdown_children.url = element.route;
+			}
+			if (element.item_type === "Action") {
+				dropdown_children.onClick = function () {
+					frappe.utils.eval(element.action);
+				};
+			}
+			help_dropdown_items.push(dropdown_children);
+		});
+
+		return help_dropdown_items;
+	},
+	get_custom_help_links() {
+		let route = frappe.get_route_str();
+		let breadcrumbs = route.split("/");
+
+		let links = [];
+		for (let i = 0; i < breadcrumbs.length; i++) {
+			let r = route.split("/", i + 1);
+			let key = r.join("/");
+			let help_links = frappe.help.help_links[key] || [];
+			links = $.merge(links, help_links);
+		}
+		if (links.length) {
+			links.push({ is_divider: true });
+		}
+		return links;
 	},
 });

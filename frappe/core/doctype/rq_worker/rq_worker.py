@@ -46,10 +46,7 @@ class RQWorker(Document):
 		super(Document, self).__init__(d)
 
 	@staticmethod
-	def get_list(args):
-		start = cint(args.get("start"))
-		page_length = cint(args.get("page_length"))
-
+	def get_list(start=0, page_length=0):
 		workers = get_workers()
 
 		valid_workers = [w for w in workers if w.pid]
@@ -62,12 +59,12 @@ class RQWorker(Document):
 		return [serialize_worker(worker) for worker in valid_workers]
 
 	@staticmethod
-	def get_count(args) -> int:
+	def get_count() -> int:
 		return len(get_workers())
 
 	# None of these methods apply to virtual workers, overriden for sanity.
 	@staticmethod
-	def get_stats(args):
+	def get_stats():
 		return {}
 
 	def db_insert(self, *args, **kwargs):
@@ -113,6 +110,6 @@ def serialize_worker(worker: Worker) -> frappe._dict:
 def compute_utilization(worker: Worker) -> float:
 	with suppress(Exception):
 		total_time = (
-			datetime.datetime.now(pytz.UTC) - worker.birth_date.replace(tzinfo=pytz.UTC)
+			datetime.datetime.now(datetime.UTC) - worker.birth_date.replace(tzinfo=datetime.UTC)
 		).total_seconds()
 		return worker.total_working_time / total_time * 100

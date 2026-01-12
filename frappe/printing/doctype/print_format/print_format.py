@@ -40,7 +40,7 @@ class PrintFormat(Document):
 		page_number: DF.Literal[
 			"Hide", "Top Left", "Top Center", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right"
 		]
-		pdf_generator: DF.Literal["wkhtmltopdf"]
+		pdf_generator: DF.Literal["wkhtmltopdf", "chrome"]
 		print_format_builder: DF.Check
 		print_format_builder_beta: DF.Check
 		print_format_for: DF.Literal["DocType", "Report"]
@@ -78,7 +78,7 @@ class PrintFormat(Document):
 			and not frappe.local.conf.get("developer_mode")
 			and not frappe.flags.in_migrate
 			and not frappe.flags.in_install
-			and not frappe.flags.in_test
+			and not frappe.in_test
 		):
 			frappe.throw(frappe._("Standard Print Format cannot be updated"))
 

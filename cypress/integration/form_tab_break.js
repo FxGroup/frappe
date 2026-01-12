@@ -3,7 +3,7 @@ const doctype_name = doctype_with_tab_break.name;
 context("Form Tab Break", () => {
 	before(() => {
 		cy.login();
-		cy.visit("/app/website");
+		cy.visit("/desk/website");
 		return cy.insert_doc("DocType", doctype_with_tab_break, true);
 	});
 	it("Should switch tab and open correct tabs on validation error", () => {
@@ -25,6 +25,6 @@ context("Form Tab Break", () => {
 
 		// After save, first tab should have dashboard
 		cy.get(".form-tabs > .nav-item").eq(0).click();
-		cy.findByText("Connections");
+		cy.findByText("Profile");
 	});
 });

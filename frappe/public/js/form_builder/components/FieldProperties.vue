@@ -26,7 +26,7 @@ let docfield_df = computed(() => {
 		}
 
 		if (
-			in_list(["fetch_from", "fetch_if_empty"], df.fieldname) &&
+			["fetch_from", "fetch_if_empty"].includes(df.fieldname) &&
 			in_list(frappe.model.no_value_type, store.form.selected_field.fieldtype)
 		) {
 			return false;
@@ -41,7 +41,11 @@ let docfield_df = computed(() => {
 			df.options = "";
 			args.value = {};
 
-			if (in_list(["Table", "Link"], store.form.selected_field.fieldtype)) {
+			if (
+				["Table MultiSelect", "Table", "Link"].includes(
+					store.form.selected_field.fieldtype
+				)
+			) {
 				df.fieldtype = "Link";
 				df.options = "DocType";
 
@@ -49,6 +53,24 @@ let docfield_df = computed(() => {
 					args.value.is_table_field = 1;
 				}
 			}
+			if (
+				store.form.selected_field.fieldtype === "Data" &&
+				!store.form.selected_field.is_virtual
+			) {
+				df.fieldtype = "Select";
+				df.options = ["", "Email", "Name", "Phone", "URL", "Barcode", "IBAN"];
+			}
+
+			if (store.form.selected_field.fieldtype === "Select") {
+				df.description = __("Enter list of Options, each on a new line.");
+			} else {
+				df.description = "";
+			}
+		}
+
+		// show link_filters docfield only when link field is selected
+		if (df.fieldname === "link_filters" && store.form.selected_field.fieldtype !== "Link") {
+			return false;
 		}
 
 		// show link_filters docfield only when link field is selected

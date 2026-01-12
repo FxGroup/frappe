@@ -16,6 +16,7 @@
   "request_headers",
   "data",
   "response_section",
+  "response_headers",
   "output",
   "error",
   "reference_section",
@@ -125,11 +126,17 @@
    "fieldtype": "Code",
    "label": "Request Headers",
    "read_only": 1
+  },
+  {
+   "fieldname": "response_headers",
+   "fieldtype": "Code",
+   "label": "Response Headers",
+   "read_only": 1
   }
  ],
  "in_create": 1,
  "links": [],
- "modified": "2023-10-09 09:36:23.856188",
+ "modified": "2025-12-11 18:23:54.669112",
  "modified_by": "Administrator",
  "module": "Integrations",
  "name": "Integration Request",
@@ -146,7 +153,8 @@
    "share": 1
   }
  ],
- "sort_field": "modified",
+ "row_format": "Dynamic",
+ "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
  "title_field": "integration_request_service",
