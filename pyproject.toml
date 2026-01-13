@@ -134,11 +134,6 @@ test = [
     "freezegun~=1.5.1",
 ]
 
-[project.urls]
-Homepage = "https://frappeframework.com/"
-Repository = "https://github.com/frappe/frappe.git"
-"Bug Reports" = "https://github.com/frappe/frappe/issues"
-
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"

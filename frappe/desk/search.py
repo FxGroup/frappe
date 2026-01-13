@@ -47,7 +47,7 @@ def search_link(
 	searchfield: str | None = None,
 	reference_doctype: str | None = None,
 	ignore_user_permissions: bool = False,
-	order_by: str | None = None
+	order_by: str | None = None,
 	*,
 	link_fieldname: str | None = None,
 ) -> list[LinkSearchResults]:
@@ -60,7 +60,7 @@ def search_link(
 		filters=filters,
 		reference_doctype=reference_doctype,
 		ignore_user_permissions=ignore_user_permissions,
-		order_by=order_by
+		order_by=order_by,
 		link_fieldname=link_fieldname,
 	)
 	
@@ -84,7 +84,7 @@ def search_widget(
 	as_dict: bool = False,
 	reference_doctype: str | None = None,
 	ignore_user_permissions: bool = False,
-	order_by: str | None = None
+	order_by: str | None = None,
 	*,
 	link_fieldname: str | None = None,
 	for_link_validation: bool = False,

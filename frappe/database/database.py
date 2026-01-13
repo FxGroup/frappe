@@ -676,9 +676,6 @@ class Database:
 						fields=fieldname,
 						distinct=distinct,
 						limit=limit,
-						for_update=for_update,
-						skip_locked=skip_locked,
-						wait=wait,
 					)
 					if isinstance(fieldname, str) and fieldname == "*":
 						as_dict = True
