@@ -1359,6 +1359,18 @@ def impersonate(user: str, reason: str = None):
 	frappe.only_for(["Administrator", "Software Developer"])
 
 	impersonator = frappe.session.user
+
+	# Block Software Developers from impersonating protected accounts
+	if impersonator.lower() not in ["administrator", "mitch@rnlabs.com.au", "mitch@fxmed.co.nz"]:
+		protected_emails = ["mitch@rnlabs.com.au", "mitch@fxmed.co.nz"]
+		target_user = frappe.get_doc("User", user)
+
+		if user == "Administrator" or "Administrator" in [r.role for r in target_user.roles]:
+			frappe.throw(_("You are not allowed to impersonate Administrator accounts"))
+
+		if target_user.email and target_user.email.lower() in [e.lower() for e in protected_emails]:
+			frappe.throw(_("You are not allowed to impersonate this user"))
+   
 	frappe.get_doc(
 		{
 			"doctype": "Activity Log",
