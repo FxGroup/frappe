@@ -357,12 +357,10 @@ class BaseDocument:
 				batches = copy.copy(base_batches)
 				batches = [{"batch_id": batch[0]["batch_no"], "qty": batch[0]["remaining_qty"], "expiry_date": batch[1], "disabled": 0} for batch in batches]
 				batch_names = [x["batch_id"] for x in batches]
-			
 			# Take out disabled batches
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
 			if specific_batch:
 				batches = [batch for batch in batches if batch['batch_id'] == specific_batch]
-
 			# Remove from batch qty any stock thats been assigned.
 			for item in self.get(key):
 				if item.get("batch_no") and item.get("item_code") == value['item_code']:

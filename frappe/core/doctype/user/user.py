@@ -1354,9 +1354,9 @@ def get_enabled_users():
 
 @frappe.whitelist(methods=["POST"])
 def impersonate(user: str, reason: str = None):
-	# Note: For now we only allow admins, we MIGHT allow system manager in future.
+	# Allow Administrator and users with "Software Developer" role
 	# All the impersonation code doesn't assume anything about user.
-	frappe.only_for("Administrator")
+	frappe.only_for(["Administrator", "Software Developer"])
 
 	impersonator = frappe.session.user
 	frappe.get_doc(
@@ -1383,7 +1383,7 @@ def impersonate(user: str, reason: str = None):
 @frappe.whitelist(methods=["POST"])
 def stop_impersonate(user: str, password: str, permission: bool = None):
     if not permission:
-        frappe.only_for("Administrator")
+        frappe.only_for(["Administrator", "Software Developer"])
     
     # Verify the user's password
     if not frappe.auth.LoginManager().check_password(user, password):
