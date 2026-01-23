@@ -39,6 +39,7 @@ from frappe.utils.password import check_password, get_password_reset_limit
 from frappe.utils.password import update_password as _update_password
 from frappe.utils.user import get_system_managers
 from frappe.website.utils import get_home_page, is_signup_disabled
+from frappe.www.login import sanitize_redirect
 
 desk_properties = (
 	"search_bar",
@@ -1025,7 +1026,7 @@ def sign_up(email: str, full_name: str, redirect_to: str) -> tuple[int, str]:
 			user.add_roles(default_role)
 
 		if redirect_to:
-			frappe.cache.hset("redirect_after_login", user.name, redirect_to)
+			frappe.cache.hset("redirect_after_login", user.name, sanitize_redirect(redirect_to))
 
 		if user.flags.email_sent:
 			return 1, _("Please check your email for verification")
@@ -1195,7 +1196,27 @@ def handle_password_test_fail(feedback: dict):
 	suggestions = feedback.get("suggestions", [])
 	warning = feedback.get("warning", "")
 
-	frappe.throw(msg=" ".join([warning, *suggestions]), title=_("Invalid Password"))
+	# Add fallback suggestion if nothing provided
+	if not (suggestions or warning):
+		suggestions = [_("Better add a few more letters or another word")]
+
+	message_parts = []
+
+	if warning:
+		message_parts.append(f'<div class="alert alert-warning" role="alert">{warning}</div>')
+
+	if suggestions:
+		suggestions_html = (
+			'<ul style="margin: 0; padding-left: 1em;">'
+			+ "".join(f"<li>{suggestion}</li>" for suggestion in suggestions)
+			+ "</ul>"
+		)
+		message_parts.append(suggestions_html)
+
+	frappe.throw(
+		msg="".join(message_parts),
+		title=_("Password requirements not met"),
+	)
 
 
 def update_gravatar(name):
@@ -1333,11 +1354,23 @@ def get_enabled_users():
 
 @frappe.whitelist(methods=["POST"])
 def impersonate(user: str, reason: str = None):
-	# Note: For now we only allow admins, we MIGHT allow system manager in future.
+	# Allow Administrator and users with "Software Developer" role
 	# All the impersonation code doesn't assume anything about user.
-	frappe.only_for("Administrator")
+	frappe.only_for(["Administrator", "Software Developer"])
 
 	impersonator = frappe.session.user
+
+	# Block Software Developers from impersonating protected accounts
+	if impersonator.lower() not in ["administrator", "mitch@rnlabs.com.au", "mitch@fxmed.co.nz"]:
+		protected_emails = ["mitch@rnlabs.com.au", "mitch@fxmed.co.nz"]
+		target_user = frappe.get_doc("User", user)
+
+		if user == "Administrator" or "Administrator" in [r.role for r in target_user.roles]:
+			frappe.throw(_("You are not allowed to impersonate Administrator accounts"))
+
+		if target_user.email and target_user.email.lower() in [e.lower() for e in protected_emails]:
+			frappe.throw(_("You are not allowed to impersonate this user"))
+   
 	frappe.get_doc(
 		{
 			"doctype": "Activity Log",
@@ -1362,7 +1395,7 @@ def impersonate(user: str, reason: str = None):
 @frappe.whitelist(methods=["POST"])
 def stop_impersonate(user: str, password: str, permission: bool = None):
     if not permission:
-        frappe.only_for("Administrator")
+        frappe.only_for(["Administrator", "Software Developer"])
     
     # Verify the user's password
     if not frappe.auth.LoginManager().check_password(user, password):
