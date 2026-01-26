@@ -2060,10 +2060,12 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 			});
 		});
 
-		return Object.keys(this.doctype_field_map).map(doctype => ({
-			doctype: doctype,
-			fieldname: this.doctype_field_map[doctype].fieldname
-		}));
+		return Object.entries(this.doctype_field_map).flatMap(([doctype, fields]) =>
+			Object.keys(fields).map(fieldname => ({
+				doctype: doctype,
+				fieldname: fieldname
+			}))
+		);
 	}
 
 	setup_report_wrapper() {
