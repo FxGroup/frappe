@@ -58,9 +58,18 @@ def two_factor_is_enabled(user=None):
 					if frappe.local.request_ip.startswith(ip):
 						enabled = False
 						break
+	
+	# Development sites disable 2FA for whitelisted IP addresses
+	if not frappe.conf.production_site:
+		whitelisted_ips = frappe.get_conf().whitelisted_ips or []
+		for ip in whitelisted_ips:
+			if frappe.local.request_ip and frappe.local.request_ip.startswith(ip):
+				enabled = False
+				break
 
 	if not user or not enabled:
 		return enabled
+
 	return two_factor_is_enabled_for_(user)
 
 
