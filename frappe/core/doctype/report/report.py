@@ -72,8 +72,15 @@ class Report(Document):
 				frappe.throw(_("Cannot edit a standard report. Please duplicate and create a new report"))
 
 		if self.is_standard == "Yes":
-			if frappe.session.user != "Administrator":
-				frappe.throw(_("Only Administrator can save a standard report. Please rename and save."))
+			is_admin = frappe.session.user == "Administrator"
+			is_system_manager = "System Manager" in frappe.get_roles()
+			is_production = frappe.conf.production_site or False
+
+			if is_production:
+				if not is_admin:
+					frappe.throw(_("Only Administrator can save a standard report on production sites. Please rename and save."))
+			elif not is_admin and not is_system_manager:
+				frappe.throw(_("Only Administrator or System Managers can save a standard report. Please rename and save."))
 
 			# Letter Head is visible only for non-standard reports.
 			# It should not remain set when it's invisible.
