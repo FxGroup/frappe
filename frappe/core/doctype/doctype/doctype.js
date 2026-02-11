@@ -33,7 +33,7 @@ frappe.ui.form.on("DocType", {
 
 	refresh: function (frm) {
 		frm.set_query("role", "permissions", function (doc) {
-			if (doc.custom && frappe.session.user != "Administrator") {
+			if (doc.custom && frappe.session.user != "Administrator" && !frappe.user.has_role("System Manager")) {
 				return {
 					query: "frappe.core.doctype.role.role.role_query",
 					filters: [["Role", "name", "!=", "All"]],
@@ -41,7 +41,7 @@ frappe.ui.form.on("DocType", {
 			}
 		});
 
-		if (frappe.session.user !== "Administrator" || !frappe.boot.developer_mode) {
+		if ((frappe.session.user !== "Administrator" && !frappe.user.has_role("System Manager")) || !frappe.boot.developer_mode) {
 			if (frm.is_new()) {
 				frm.set_value("custom", 1);
 			}

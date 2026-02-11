@@ -4,7 +4,7 @@ frappe.listview_settings["DocType"] = {
 	},
 
 	new_doctype_dialog() {
-		let non_developer = frappe.session.user !== "Administrator" || !frappe.boot.developer_mode;
+		let non_developer = (frappe.session.user !== "Administrator" && !frappe.user.has_role("System Manager")) || !frappe.boot.developer_mode;
 		let fields = [
 			{
 				label: __("Name"),
