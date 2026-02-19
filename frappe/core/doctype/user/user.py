@@ -1387,7 +1387,7 @@ def impersonate(user: str, reason: str = None):
 @frappe.whitelist(methods=["POST"])
 def stop_impersonate(user: str, password: str, permission: bool = None):
     if not permission:
-        frappe.only_for(["Administrator", "Software Developer"])
+        frappe.only_for(["Administrator", "Software Developer", "System Support"])
     
     # Verify the user's password
     if not frappe.auth.LoginManager().check_password(user, password):
