@@ -1356,7 +1356,7 @@ def get_enabled_users():
 def impersonate(user: str, reason: str = None):
 	# Allow Administrator and users with "Software Developer" role
 	# All the impersonation code doesn't assume anything about user.
-	frappe.only_for(["Administrator", "Software Developer"])
+	frappe.only_for(["Administrator", "Software Developer", "System Support"])
 
 	impersonator = frappe.session.user
 
@@ -1381,14 +1381,6 @@ def impersonate(user: str, reason: str = None):
 		}
 	).insert(ignore_permissions=True, ignore_links=True)
 
-	# notification = frappe.new_doc(
-	# 	"Notification Log",
-	# 	for_user=user,
-	# 	from_user=frappe.session.user,
-	# 	subject=_("{0} just impersonated as you. They gave this reason: {1}").format(impersonator, reason),
-	# )
-	# notification.set("type", "Alert")
-	# notification.insert(ignore_permissions=True)
 	frappe.local.login_manager.impersonate(user)
 
 
