@@ -50,7 +50,7 @@ class Contact(Document):
 
 	# end: auto-generated types
 	def autoname(self):
-		self.name = self._get_full_name()
+		# self.name = self._get_full_name()
 
 		# concat party name if reqd
 		for link in self.links:
