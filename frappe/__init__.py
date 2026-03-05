@@ -208,6 +208,7 @@ def init(site: str, sites_path: str = ".", new_site: bool = False, force=False) 
 			"mute_messages": False,
 			"ignore_links": False,
 			"mute_emails": False,
+			"force_emails": False,
 			"has_dataurl": False,
 			"new_site": new_site,
 			"read_only": False,
@@ -712,6 +713,7 @@ def sendmail(
 	email_read_tracker_url=None,
 	x_priority: Literal[1, 3, 5] = 3,
 	email_headers=None,
+	force=False,
 ) -> Optional["EmailQueue"]:
 	"""Send email using user's default **Email Account** or global default **Email Account**.
 
@@ -741,6 +743,7 @@ def sendmail(
 	:param with_container: Wraps email inside a styled container
 	:param x_priority: 1 = HIGHEST, 3 = NORMAL, 5 = LOWEST
 	:param email_headers: Additional headers to be added in the email, e.g. {"X-Custom-Header": "value"} or {"Custom-Header": "value"}. Automatically prepends "X-" to the header name if not present.
+	:param force: Force send email even on dev servers where emails are muted. Use for testing.
 	"""
 
 	if recipients is None:
@@ -801,7 +804,14 @@ def sendmail(
 	)
 
 	# build email queue and send the email if send_now is True.
-	return builder.process(send_now=now)
+	# If force=True, temporarily allow emails even on dev servers
+	if force:
+		flags.force_emails = True
+	try:
+		return builder.process(send_now=now)
+	finally:
+		if force:
+			flags.force_emails = False
 
 
 whitelisted = []
@@ -2090,6 +2100,14 @@ def as_json(obj: dict | list, indent=1, separators=None, ensure_ascii=True) -> s
 
 
 def are_emails_muted():
+	# Allow explicit override to force send emails (for dev testing)
+	if flags.force_emails:
+		return False
+
+	# Check for dev server marker file (blocks emails on dev servers)
+	if os.path.exists("/etc/frappe-dev-server"):
+		return True
+
 	return flags.mute_emails or cint(conf.get("mute_emails") or 0) or False
 
 
