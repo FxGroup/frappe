@@ -61,7 +61,7 @@ class Page(Document):
 			frappe.throw(_("Not in Developer Mode"))
 
 		# setting ignore_permissions via update_setup_wizard_access (setup_wizard.py)
-		if frappe.session.user != "Administrator" and not self.flags.ignore_permissions:
+		if frappe.session.user != "Administrator" and not self.flags.ignore_permissions and "System Manager" not in frappe.get_roles():
 			frappe.throw(_("Only Administrator can edit"))
 
 	# export
