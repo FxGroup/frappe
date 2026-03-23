@@ -215,7 +215,7 @@ class CustomField(Document):
 
 	def on_trash(self):
 		# check if Admin owned field + Allowing software devs to edit
-		if self.owner == "Administrator" and frappe.session.user != "Administrator" and not "Software Manager" in frappe.get_roles():
+		if self.owner == "Administrator" and frappe.session.user != "Administrator" and not "Software Developer" in frappe.get_roles() and self.owner != frappe.session.user:
 			frappe.throw(
 				_(
 					"Custom Field {0} is created by the Administrator and can only be deleted through the Administrator account."
