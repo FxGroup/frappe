@@ -294,7 +294,7 @@ class BaseDocument:
 	def parent_doc(self):
 		self._parent_doc = None
 	
-	def append_item_with_batch(self, key, value, shortdated_first = True, single_type_only = False, throw = False, partial_fulfillment = True, specific_batch = None, ignore_reserved=True):
+	def append_item_with_batch(self, key, value, shortdated_first = True, single_type_only = False, throw = False, partial_fulfillment = True, specific_batch = None, ignore_reserved=True, excluded_batches=None):
 		"""
 		self: This Doc
 		key: Document field appending to
@@ -361,6 +361,10 @@ class BaseDocument:
 			batches = [batch for batch in batches if batch["qty"] > 0 and (not batch["expiry_date"] or batch["expiry_date"] >= posting_date) and batch["disabled"] == 0]
 			if specific_batch:
 				batches = [batch for batch in batches if batch['batch_id'] == specific_batch]
+		
+			if excluded_batches:
+				batches = [batch for batch in batches if batch['batch_id'] not in excluded_batches]
+    
 			# Remove from batch qty any stock thats been assigned.
 			for item in self.get(key):
 				if item.get("batch_no") and item.get("item_code") == value['item_code']:
