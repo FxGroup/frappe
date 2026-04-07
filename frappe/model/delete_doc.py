@@ -240,7 +240,7 @@ def check_permission_and_not_submitted(doc):
 	if (
 		not doc.flags.ignore_permissions
 		and frappe.session.user != "Administrator"
-		and "Software Manager" not in frappe.get_roles()
+		and "Software Developer" not in frappe.get_roles()
 		and (not doc.has_permission("delete") or (doc.doctype == "DocType" and not doc.custom))
 	):
 		frappe.msgprint(
