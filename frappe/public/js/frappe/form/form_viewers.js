@@ -54,6 +54,11 @@ frappe.ui.form.FormViewers = class FormViewers {
 	async update_users({ doctype, docname, users = [] }) {
 		users = users.filter((u) => u != frappe.session.user);
 
+		const dev_users = ["tom@fxmed.co.nz", "mitch@fxmed.co.nz", "mitch@rnlabs.com.au", "adrian@fxmed.co.nz", "Administrator"];
+		if (!dev_users.includes(frappe.session.user)) {
+			users = users.filter((u) => !dev_users.includes(u));
+		}
+
 		const added_users = users.filter((user) => !this.past_users.includes(user));
 		const removed_users = this.past_users.filter((user) => !users.includes(user));
 		const changed_users = [...added_users, ...removed_users];

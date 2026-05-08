@@ -720,7 +720,7 @@ frappe.ui.form.Form = class FrappeForm {
 			}
 			this.toolbar.refresh();
 		}
-		this.viewers.refresh();
+		this.viewers && this.viewers.refresh();
 
 		this.dashboard.refresh();
 		frappe.breadcrumbs.update();
