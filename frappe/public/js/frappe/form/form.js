@@ -99,13 +99,10 @@ frappe.ui.form.Form = class FrappeForm {
 			page: this.page,
 		});
 
-		const dev_users = ["tom@fxmed.co.nz", "mitch@fxmed.co.nz", "mitch@rnlabs.com.au", "adrian@fxmed.co.nz", "Administrator"];
-		if (!dev_users.includes(frappe.session.user)) {
-			this.viewers = new frappe.ui.form.FormViewers({
-				frm: this,
-				parent: $('<div class="form-viewers d-flex"></div>').prependTo(this.page.page_actions),
-			});
-		}
+		this.viewers = new frappe.ui.form.FormViewers({
+			frm: this,
+			parent: $('<div class="form-viewers d-flex"></div>').prependTo(this.page.page_actions),
+		});
 
 		// navigate records keyboard shortcuts
 		this.add_form_keyboard_shortcuts();
