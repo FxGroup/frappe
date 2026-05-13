@@ -175,7 +175,7 @@ def close_all_assignments(doctype, name, ignore_permissions=False):
 
 @frappe.whitelist()
 def remove(doctype, name, assign_to, ignore_permissions=False):
-	return set_status(doctype, name, "", assign_to, status="Canceled", ignore_permissions=ignore_permissions)
+	return set_status(doctype, name, "", assign_to, status="Closed", ignore_permissions=ignore_permissions)
 
 
 @frappe.whitelist()
