@@ -215,12 +215,12 @@ class CustomField(Document):
 
 	def on_trash(self):
 		# check if Admin owned field + Allowing software devs to edit
-		if self.owner == "Administrator" and frappe.session.user != "Administrator" and not "Software Manager" in frappe.get_roles():
-			frappe.throw(
-				_(
-					"Custom Field {0} is created by the Administrator and can only be deleted through the Administrator account."
-				).format(frappe.bold(self.label))
-			)
+		# if self.owner == "Administrator" and frappe.session.user != "Administrator" and not "Software Manager" in frappe.get_roles():
+		# 	frappe.throw(
+		# 		_(
+		# 			"Custom Field {0} is created by the Administrator and can only be deleted through the Administrator account."
+		# 		).format(frappe.bold(self.label))
+		# 	)
 
 		# delete property setter entries
 		frappe.db.delete("Property Setter", {"doc_type": self.dt, "field_name": self.fieldname})
