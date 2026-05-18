@@ -140,10 +140,6 @@ class Contact(Document):
 			if d.is_primary == 1:
 				primary_email_exists = True
 				self.email_id = d.email_id.strip()
-			if d.is_marketing == 1:
-				marketing_email_exists = True
-				self.marketing_email = d.email_id.strip()
-
 
 		if not primary_email_exists:
 			self.email_id = ""
