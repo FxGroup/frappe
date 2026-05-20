@@ -1,6 +1,6 @@
 <div class="clearfix"></div>
 {% for(var i=0, l=contact_list.length; i<l; i++) { %}
-	{% if (!contact_list[i].disabled) { %}
+	{% if (!contact_list[i].disabled && !contact_list[i].unsubscribed) { %}
 		<div class="address-box">
 			<p class="h6 flex align-center">
 				{%= contact_list[i].first_name %} {%= contact_list[i].last_name %}
