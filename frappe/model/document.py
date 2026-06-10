@@ -1666,7 +1666,7 @@ class Document(BaseDocument):
 			filters={
 				"reference_type": self.doctype,
 				"reference_name": self.name,
-				"status": ("!=", "Cancelled"),
+				"status": ("not in", ["Cancelled", "Closed"]),
 			},
 			pluck="allocated_to",
 		)
