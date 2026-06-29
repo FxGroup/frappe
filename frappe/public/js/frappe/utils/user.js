@@ -50,6 +50,14 @@ $.extend(frappe.user, {
 				return true;
 		}
 	},
+	has_role_profile: function(rl) {
+		if (typeof rl == "string") rl = [rl];
+		var profile = frappe.boot ? frappe.boot.user.role_profile_name : "";
+		for (var i in rl) {
+			if (rl[i] == profile) return true;
+		}
+		return false;
+	},
 	get_desktop_items: function () {
 		// hide based on permission
 		var modules_list = $.map(frappe.boot.allowed_modules, function (icon) {
