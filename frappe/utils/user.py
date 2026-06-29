@@ -225,6 +225,7 @@ class UserPermissions:
 				"user_type",
 				"onboarding_status",
 				"default_workspace",
+				"role_profile_name",
 			],
 			as_dict=True,
 		)
