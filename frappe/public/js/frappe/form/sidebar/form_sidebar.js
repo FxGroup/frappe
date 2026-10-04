@@ -110,21 +110,46 @@ frappe.ui.form.Sidebar = class {
 						comment_when(this.frm.doc.creation)
 				);
 				
-			const Access = new Promise((resolve, reject) => {
-				let data = ""
-				let date
-				frappe.db.get_list('Access Log',
-				{fields: ['user', 'creation'], 
-				filters:[['reference_document', '=', this.frm.doc.name],['method', '=', 'Print']]}).then((res) => {
-					res.forEach(element => {
-						date = new Date(element.creation)					
-						date.setSeconds(0, 0);
-						data += frappe.user.full_name(element["user"]).split(' ')[0].bold() + "</b>" + " printed on <br>" + date.toLocaleString('en-AU') + "<br>"
+			const PrintTimeline = new Promise((resolve, reject) => {
+				if (this.frm.doctype !== "Sales Invoice") {
+					let data = ""
+					let date
+					frappe.db.get_list('Access Log',
+					{fields: ['user', 'creation'], 
+					filters:[['reference_document', '=', this.frm.doc.name],['method', '=', 'Print']]}).then((res) => {
+						res.forEach(element => {
+							date = new Date(element.creation)
+							date.setSeconds(0, 0);
+							data += frappe.user.full_name(element["user"]).split(' ')[0].bold() + "</b>" + " printed on <br>" + date.toLocaleString('en-AU') + "<br>"
+						});
+						resolve(data)
+					});
+					return;
+				}
+
+				frappe.call({
+					method: "fxnmrnth.utils.API.bulk_print.get_print_timeline",
+					args: { sales_invoice: this.frm.doc.name },
+				}).then((r) => {
+					let data = ""
+					let date
+					(r.message || []).forEach(event => {
+						date = new Date(event.datetime)
+						date.setSeconds(0, 0)
+						let subject = ""
+						let action = event.action
+						if (event.subject === "user") {
+							let first_name = frappe.user.full_name(event.user).split(' ')[0]
+							subject = frappe.utils.get_form_link("User", event.user, true, first_name.bold()) + " "
+							action = action.charAt(0).toLowerCase() + action.slice(1)
+						}
+						data += "<div style='margin-bottom: 10px;'>" + subject + action +
+							"<br><span class='text-muted'>" + date.toLocaleString('en-AU') + "</span></div>"
 					});
 					resolve(data)
 				});
 			})
-			Access.then((items)=>{
+			PrintTimeline.then((items)=>{
 			this.sidebar
 				.find(".printed-by")
 				.html(items);
